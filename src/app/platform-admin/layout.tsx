@@ -14,6 +14,8 @@ import {
   Settings,
   ArrowLeft,
 } from "lucide-react";
+import { AdminSignOutButton } from "@/components/layout/admin-sign-out-button";
+
 
 export default async function PlatformAdminLayout({
   children,
@@ -79,13 +81,16 @@ export default async function PlatformAdminLayout({
             </div>
           </div>
 
+          <AdminSignOutButton />
+
           <Link
             href="/"
-            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 transition-colors"
+            className="flex items-center justify-center gap-1.5 w-full py-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition-colors"
           >
             <ArrowLeft className="h-3.5 w-3.5" /> Return to Application
           </Link>
         </div>
+
       </aside>
 
       {/* Main Content Area */}
