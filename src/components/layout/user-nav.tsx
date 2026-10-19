@@ -3,6 +3,8 @@
 import React, { useTransition } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { LogOut, User, Shield } from "lucide-react";
+import Link from "next/link";
+
 
 interface UserNavProps {
   user: {
@@ -37,10 +39,15 @@ export function UserNav({ user, role }: UserNavProps) {
         </div>
         <div className="flex items-center justify-end gap-1 mt-1">
           {user.platformRole === "SUPER_ADMIN" && (
-            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
-              <Shield className="h-2.5 w-2.5" /> ADMIN
-            </span>
+            <Link
+              href="/platform-admin"
+              className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm"
+              title="Open Platform Administrator Console"
+            >
+              <Shield className="h-3 w-3" /> Platform Admin
+            </Link>
           )}
+
           <span className="text-xs text-slate-500 font-medium">{roleLabel}</span>
         </div>
       </div>

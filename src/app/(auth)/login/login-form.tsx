@@ -28,9 +28,10 @@ export function LoginForm() {
           setFieldErrors(result.fieldErrors);
         }
       } else {
-        router.push("/");
+        router.push(result.redirectUrl || "/");
         router.refresh();
       }
+
     });
   };
 

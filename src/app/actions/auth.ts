@@ -19,7 +19,9 @@ export interface ActionResult {
   success: boolean;
   error?: string;
   fieldErrors?: Record<string, string[]>;
+  redirectUrl?: string;
 }
+
 
 export async function registerAction(prevState: any, formData: FormData): Promise<ActionResult> {
   const rawData = {
@@ -90,8 +92,13 @@ export async function loginAction(prevState: any, formData: FormData): Promise<A
       maxAge: SESSION_DURATION_DAYS * 24 * 60 * 60,
     });
 
-    return { success: true };
+    const isPlatformAdmin = result.user.platformRole === "SUPER_ADMIN";
+    return {
+      success: true,
+      redirectUrl: isPlatformAdmin ? "/platform-admin" : "/",
+    };
   } catch (err: any) {
+
     return {
       success: false,
       error: err.message || "Invalid credentials.",

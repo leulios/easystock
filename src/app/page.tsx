@@ -6,9 +6,12 @@ import { ShieldCheck, Store, TrendingUp, Layers, CheckCircle2, ArrowRight } from
 export default async function HomePage() {
   const context = await getCurrentContext();
 
-  if (context && context.shopId) {
+  if (context?.isPlatformAdmin) {
+    redirect("/platform-admin");
+  } else if (context && context.shopId) {
     redirect(`/${context.shopId}/dashboard`);
   }
+
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-gradient-to-b from-slate-50 via-white to-slate-100">
