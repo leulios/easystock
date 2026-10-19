@@ -21,9 +21,13 @@ import {
   Package,
   Users,
   Camera,
+  Zap,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CameraScannerModal } from "@/components/pos/camera-scanner-modal";
+import { PhoneScannerModal } from "@/components/pos/phone-scanner-modal";
+import { QuickManualSellModal } from "@/components/pos/quick-manual-sell-modal";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface POSProduct {
   id: string;
@@ -57,6 +61,7 @@ interface POSTerminalProps {
     phone: string | null;
     outstandingCredit: number;
   }>;
+  shopSlug?: string;
   shop: {
     id: string;
     name: string;
@@ -65,8 +70,9 @@ interface POSTerminalProps {
   };
 }
 
-export function POSTerminal({ products, categories, customers = [], shop }: POSTerminalProps) {
+export function POSTerminal({ products, categories, customers = [], shopSlug, shop }: POSTerminalProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState("");
@@ -80,6 +86,8 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedSale, setCompletedSale] = useState<any>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
+  const [isQuickManualSellOpen, setIsQuickManualSellOpen] = useState(false);
 
   // Generate a fresh idempotency key when cart transitions from empty to having items
   useEffect(() => {
@@ -230,29 +238,53 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
       <div className="flex-1 flex flex-col min-w-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         {/* Search & Category Filter */}
         <div className="p-4 border-b border-slate-200 space-y-3">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap sm:flex-nowrap gap-2">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="h-4 w-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
               <input
                 ref={searchInputRef}
                 type="text"
                 value={search}
                 onChange={(e) => handleSearchChange(e.target.value)}
-                placeholder="Search by name, SKU, or hardware scanner..."
+                placeholder={t("searchItemPlaceholder")}
                 className="w-full h-10 pl-9 pr-10 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium"
               />
               <Barcode className="h-5 w-5 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
             </div>
 
+            {/* Quick 1-Item Sell Modal Trigger */}
+            <Button
+              type="button"
+              onClick={() => setIsQuickManualSellOpen(true)}
+              className="h-10 px-3 bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 shrink-0 text-xs font-bold shadow-sm"
+              title={t("quickManualSell")}
+            >
+              <Zap className="h-4 w-4" />
+              <span>{language === "am" ? "ፈጣን መሸጫ" : "Quick Sell"}</span>
+            </Button>
+
+            {/* Phone Scanner Modal Trigger */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPhoneModalOpen(true)}
+              className="h-10 px-3 bg-blue-50/80 hover:bg-blue-100 border-blue-200 text-blue-700 flex items-center gap-1.5 shrink-0 text-xs font-bold shadow-sm"
+              title={t("openPhoneScanner")}
+            >
+              <Smartphone className="h-4 w-4 text-blue-600" />
+              <span>{language === "am" ? "የስልክ መቃኛ" : "Phone Scanner"}</span>
+            </Button>
+
+            {/* Local Webcam/Device Camera */}
             <Button
               type="button"
               variant="outline"
               onClick={() => setIsCameraOpen(true)}
-              className="h-10 px-3 bg-white hover:bg-blue-50 border-slate-300 text-slate-700 flex items-center gap-1.5 shrink-0 text-xs font-semibold shadow-sm"
+              className="h-10 px-3 bg-white hover:bg-slate-50 border-slate-300 text-slate-700 flex items-center gap-1.5 shrink-0 text-xs font-semibold shadow-sm"
               title="Scan with device camera"
             >
-              <Camera className="h-4 w-4 text-blue-600" />
-              <span className="hidden sm:inline">Camera Scan</span>
+              <Camera className="h-4 w-4 text-slate-600" />
+              <span className="hidden md:inline">{language === "am" ? "ካሜራ" : "Camera"}</span>
             </Button>
           </div>
 
@@ -265,7 +297,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              All Items ({products.length})
+              {t("all")} ({products.length})
             </button>
             {categories.map((c) => (
               <button
@@ -288,8 +320,14 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
           {filteredProducts.length === 0 ? (
             <div className="col-span-full py-16 text-center text-slate-400">
               <Package className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-              <p className="font-medium text-slate-600">No matching products</p>
-              <p className="text-xs">Try clearing your search or add new products to the catalog.</p>
+              <p className="font-medium text-slate-600">
+                {language === "am" ? "ምንም የተገኘ ዕቃ የለም" : "No matching products"}
+              </p>
+              <p className="text-xs">
+                {language === "am"
+                  ? "የፍለጋ ቃሉን ያጽዱ ወይም አዲስ ዕቃ በክምችት ገጽ ይመዝግቡ።"
+                  : "Try clearing your search or add new products to the catalog."}
+              </p>
             </div>
           ) : (
             filteredProducts.map((p) => (
@@ -318,7 +356,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
                         : "bg-slate-200/70 text-slate-700"
                     }`}
                   >
-                    {p.currentStock} in stock
+                    {p.currentStock <= 0 ? t("outOfStock") : `${p.currentStock} ${t("inStock")}`}
                   </span>
                 </div>
               </button>
@@ -332,14 +370,16 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
         <div className="p-3 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShoppingCart className="h-4 w-4 text-blue-600" />
-            <h2 className="font-bold text-slate-900 text-sm">Active Cart ({cart.length})</h2>
+            <h2 className="font-bold text-slate-900 text-sm">
+              {t("cart")} ({cart.length})
+            </h2>
           </div>
           {cart.length > 0 && (
             <button
               onClick={() => setCart([])}
               className="text-xs text-rose-600 hover:underline font-medium"
             >
-              Clear Cart
+              {t("clearCart")}
             </button>
           )}
         </div>
@@ -347,17 +387,20 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
         {/* Customer Account Selector */}
         <div className="p-3 bg-slate-50 border-b border-slate-200">
           <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Users className="h-3 w-3 text-slate-400" /> Customer Account
+            <Users className="h-3 w-3 text-slate-400" /> {t("selectCustomer")}
           </label>
           <select
             value={selectedCustomerId}
             onChange={(e) => setSelectedCustomerId(e.target.value)}
             className="w-full h-8 px-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
           >
-            <option value="">Walk-in Customer (Guest)</option>
+            <option value="">{t("walkInCustomer")}</option>
             {customers.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.name} {c.phone ? `(${c.phone})` : ""} {c.outstandingCredit > 0 ? `• [Debt: ${formatCurrency(c.outstandingCredit, shop.currency)}]` : ""}
+                {c.name} {c.phone ? `(${c.phone})` : ""}{" "}
+                {c.outstandingCredit > 0
+                  ? `• [${t("customerCreditBalance")}: ${formatCurrency(c.outstandingCredit, shop.currency)}]`
+                  : ""}
               </option>
             ))}
           </select>
@@ -376,10 +419,10 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
           {cart.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center text-slate-400 p-6">
               <ShoppingCart className="h-10 w-10 text-slate-200 mb-2" />
-              <p className="font-medium text-slate-600 text-sm">Cart is empty</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Scan an item or tap a product on the left to add to sale.
+              <p className="font-medium text-slate-600 text-sm">
+                {language === "am" ? "የተመረጠ ዕቃ የለም" : "Cart is empty"}
               </p>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs">{t("emptyCart")}</p>
             </div>
           ) : (
             cart.map((item) => (
@@ -417,7 +460,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
                     onClick={() => removeFromCart(item.variantId)}
                     className="text-[10px] text-slate-400 hover:text-red-600"
                   >
-                    Remove
+                    {t("delete")}
                   </button>
                 </div>
               </div>
@@ -429,17 +472,19 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
         <div className="p-4 border-t border-slate-200 bg-slate-50 space-y-3">
           <div className="space-y-1.5 text-xs text-slate-600">
             <div className="flex justify-between">
-              <span>Subtotal:</span>
+              <span>{t("subtotal")}:</span>
               <span>{formatCurrency(subtotal, shop.currency)}</span>
             </div>
             {taxAmount > 0 && (
               <div className="flex justify-between">
-                <span>Tax ({shop.taxRate}%):</span>
+                <span>
+                  {t("tax")} ({shop.taxRate}%):
+                </span>
                 <span>{formatCurrency(taxAmount, shop.currency)}</span>
               </div>
             )}
             <div className="flex justify-between text-base font-extrabold text-slate-900 pt-1.5 border-t border-slate-200">
-              <span>Grand Total:</span>
+              <span>{t("totalToPay")}:</span>
               <span>{formatCurrency(grandTotal, shop.currency)}</span>
             </div>
           </div>
@@ -447,7 +492,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
           {/* Payment Method Selector */}
           <div>
             <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-              Payment Method
+              {t("paymentMethod")}
             </label>
             <div className="grid grid-cols-4 gap-1.5">
               <button
@@ -481,7 +526,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
-                <Smartphone className="h-3.5 w-3.5" /> Mobile
+                <Smartphone className="h-3.5 w-3.5" /> Telebirr
               </button>
               <button
                 type="button"
@@ -503,7 +548,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
                 <input
                   type="number"
                   step="0.01"
-                  placeholder={`Tendered (default: ${grandTotal.toFixed(2)})`}
+                  placeholder={`${t("amountReceived")} (default: ${grandTotal.toFixed(2)})`}
                   value={tenderedAmount}
                   onChange={(e) => setTenderedAmount(e.target.value)}
                   className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
@@ -511,7 +556,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
               </div>
               {changeDue > 0 && (
                 <div className="text-right text-xs">
-                  <span className="text-slate-400 text-[10px]">Change: </span>
+                  <span className="text-slate-400 text-[10px]">{t("changeDue")}: </span>
                   <span className="font-bold text-emerald-600">
                     {formatCurrency(changeDue, shop.currency)}
                   </span>
@@ -521,15 +566,25 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
           )}
 
           {paymentMethod === PaymentMethod.STORE_CREDIT && (
-            <div className={`p-2.5 rounded-lg text-xs font-medium border ${
-              !selectedCustomerId
-                ? "bg-amber-50 border-amber-300 text-amber-800"
-                : "bg-purple-50 border-purple-200 text-purple-800"
-            }`}>
+            <div
+              className={`p-2.5 rounded-lg text-xs font-medium border ${
+                !selectedCustomerId
+                  ? "bg-amber-50 border-amber-300 text-amber-800"
+                  : "bg-purple-50 border-purple-200 text-purple-800"
+              }`}
+            >
               {!selectedCustomerId ? (
-                <span>⚠️ Please select a customer account above to charge to Store Credit.</span>
+                <span>
+                  {language === "am"
+                    ? "⚠️ እባክዎ ለዱቤ ሽያጭ ከላይ የደንበኛ አካውንት ይምረጡ።"
+                    : "⚠️ Please select a customer account above to charge to Store Credit."}
+                </span>
               ) : (
-                <span>✓ Amount will be added to customer's outstanding store balance.</span>
+                <span>
+                  {language === "am"
+                    ? "✓ ሂሳቡ በደንበኛው የዱቤ ዕዳ ላይ ይመዘገባል።"
+                    : "✓ Amount will be added to customer's outstanding store balance."}
+                </span>
               )}
             </div>
           )}
@@ -540,7 +595,7 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
             isLoading={isPending}
             className="w-full h-11 text-sm font-bold shadow-md"
           >
-            Complete Sale ({formatCurrency(grandTotal, shop.currency)})
+            {t("completeSaleBtn")} ({formatCurrency(grandTotal, shop.currency)})
           </Button>
         </div>
       </div>
@@ -557,6 +612,20 @@ export function POSTerminal({ products, categories, customers = [], shop }: POST
         isOpen={isCameraOpen}
         onClose={() => setIsCameraOpen(false)}
         onScan={(code) => handleSearchChange(code)}
+      />
+
+      <PhoneScannerModal
+        isOpen={isPhoneModalOpen}
+        onClose={() => setIsPhoneModalOpen(false)}
+        shopSlug={shopSlug || shop.id}
+      />
+
+      <QuickManualSellModal
+        isOpen={isQuickManualSellOpen}
+        onClose={() => setIsQuickManualSellOpen(false)}
+        products={products}
+        customers={customers}
+        currency={shop.currency}
       />
     </div>
   );

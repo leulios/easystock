@@ -1,6 +1,7 @@
 import React from "react";
 import { ShopSwitcher } from "./shop-switcher";
 import { UserNav } from "./user-nav";
+import { LanguageSwitcher } from "./language-switcher";
 import { ShopRole } from "@prisma/client";
 
 interface HeaderProps {
@@ -33,7 +34,11 @@ export function Header({ currentShop, availableShops, user, role }: HeaderProps)
         />
       </div>
 
-      <UserNav user={user} role={role} />
+      <div className="flex items-center gap-4">
+        <LanguageSwitcher />
+        <UserNav user={user} role={role} />
+      </div>
     </header>
   );
 }
+

@@ -62,6 +62,7 @@ export default async function POSPage({ params }: POSPageProps) {
       products={posProducts}
       categories={categories}
       customers={posCustomers}
+      shopSlug={shopSlug}
       shop={{
         id: shop.id,
         name: shop.name,

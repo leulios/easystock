@@ -18,8 +18,11 @@ import {
   Layers,
   ArrowUpRight,
   Store,
+  Zap,
+  Smartphone,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface OwnerDashboardClientProps {
   initialData: any;
@@ -28,6 +31,7 @@ interface OwnerDashboardClientProps {
 
 export function OwnerDashboardClient({ initialData, shopSlug }: OwnerDashboardClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [data, setData] = useState(initialData);
   const [period, setPeriod] = useState<DateRangePreset>(initialData.period || "30d");
   const [isPending, startTransition] = useTransition();
@@ -41,6 +45,36 @@ export function OwnerDashboardClient({ initialData, shopSlug }: OwnerDashboardCl
 
   return (
     <div className="space-y-8">
+      {/* Quick Sales Action Banner for Shop Owner */}
+      <div className="p-5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-xs font-semibold backdrop-blur-sm">
+            <Zap className="h-3.5 w-3.5 text-amber-300" />
+            <span>{language === "am" ? "የሽያጭና የገንዘብ መቀበያ ማዕከል" : "Fast Sales & POS Terminal"}</span>
+          </div>
+          <h2 className="text-xl font-extrabold tracking-tight">
+            {t("startSellingNow")}
+          </h2>
+          <p className="text-xs text-blue-100 max-w-xl">
+            {t("startSellingDesc")}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link href={`/${shopSlug}/pos`}>
+            <Button className="bg-white hover:bg-slate-100 text-blue-700 font-bold text-xs h-10 px-4 shadow-sm border-0">
+              <ShoppingCart className="h-4 w-4 mr-1.5 text-blue-600" />
+              {t("openPOS")}
+            </Button>
+          </Link>
+          <Link href={`/${shopSlug}/scan`}>
+            <Button className="bg-blue-800/80 hover:bg-blue-900 text-white font-bold text-xs h-10 px-4 border border-white/20 shadow-sm">
+              <Smartphone className="h-4 w-4 mr-1.5 text-amber-300" />
+              {t("openScanner")}
+            </Button>
+          </Link>
+        </div>
+      </div>
       {/* Top Bar: Title & Date Range Presets & Action Shortcuts */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-slate-200">
         <div>

@@ -14,10 +14,14 @@ import {
   BarChart3,
   Settings,
   Shield,
+  Smartphone,
 } from "lucide-react";
 import { ShopRole } from "@prisma/client";
+import { useLanguage } from "@/lib/i18n/context";
+import { LanguageSwitcher } from "./language-switcher";
 
 interface SidebarProps {
+
   shopId: string;
   role: ShopRole;
   isPlatformAdmin?: boolean;
@@ -25,59 +29,67 @@ interface SidebarProps {
 
 export function Sidebar({ shopId, role, isPlatformAdmin }: SidebarProps) {
   const pathname = usePathname();
+  const { t, language } = useLanguage();
 
   const navigation = [
     {
-      name: "Dashboard",
+      name: t("navDashboard"),
       href: `/${shopId}/dashboard`,
       icon: LayoutDashboard,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
     },
     {
-      name: "Point of Sale",
+      name: t("navSellItems"),
       href: `/${shopId}/pos`,
       icon: ShoppingCart,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
-      badge: "Fast POS",
+      badge: language === "am" ? "ፈጣን መሸጫ" : "Sell Now",
     },
     {
-      name: "Inventory",
+      name: t("navPhoneScanner"),
+      href: `/${shopId}/scan`,
+      icon: Smartphone,
+      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
+      badge: language === "am" ? "በስልክ" : "Mobile",
+    },
+    {
+      name: t("navStock"),
       href: `/${shopId}/inventory`,
       icon: Boxes,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
     },
     {
-      name: "Products & Catalog",
+      name: t("navItems"),
       href: `/${shopId}/products`,
       icon: Tag,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
-      name: "Purchases & Receiving",
+      name: t("navReceiveGoods"),
       href: `/${shopId}/purchases`,
       icon: Truck,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
-      name: "Customers",
+      name: t("navCustomers"),
       href: `/${shopId}/customers`,
       icon: Users,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
     },
     {
-      name: "Expenses",
+      name: t("navExpenses"),
       href: `/${shopId}/expenses`,
       icon: Receipt,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
-      name: "Reports & Financials",
+      name: t("navReports"),
       href: `/${shopId}/reports`,
       icon: BarChart3,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
-      name: "Shop Settings",
+      name: t("navSettings"),
       href: `/${shopId}/settings`,
       icon: Settings,
       roles: [ShopRole.SHOP_OWNER],
@@ -85,6 +97,7 @@ export function Sidebar({ shopId, role, isPlatformAdmin }: SidebarProps) {
   ];
 
   const visibleNav = navigation.filter((item) => item.roles.includes(role));
+
 
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 min-h-screen">
@@ -136,17 +149,23 @@ export function Sidebar({ shopId, role, isPlatformAdmin }: SidebarProps) {
         </nav>
       </div>
 
-      {isPlatformAdmin && (
-        <div className="p-4 border-t border-slate-200 bg-amber-50/50">
+      <div className="p-4 border-t border-slate-200 space-y-2">
+        <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+          <span>{language === "am" ? "ቋንቋ" : "Language"}</span>
+          <LanguageSwitcher />
+        </div>
+
+        {isPlatformAdmin && (
           <Link
             href="/platform-admin"
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-amber-900 hover:bg-amber-100/60 transition-colors"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100/60 transition-colors"
           >
             <Shield className="h-4 w-4 text-amber-600 shrink-0" />
             <span>Platform Admin Console</span>
           </Link>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
+
   );
 }
