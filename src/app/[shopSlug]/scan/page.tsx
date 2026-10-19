@@ -3,14 +3,41 @@ import { redirect } from "next/navigation";
 import { listProducts } from "@/lib/services/product-service";
 import { prisma } from "@/lib/db";
 import { MobileScannerClient } from "./mobile-scanner-client";
+import { hashSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth/session";
+import { resolveSessionContext } from "@/lib/auth/service";
+import { cookies } from "next/headers";
 
 interface ScanPageProps {
   params: Promise<{ shopSlug: string }>;
+  searchParams?: Promise<{ token?: string }>;
 }
 
-export default async function ScanPage({ params }: ScanPageProps) {
+export default async function ScanPage({ params, searchParams }: ScanPageProps) {
   const { shopSlug } = await params;
-  const context = await getCurrentContext();
+  const sParams = searchParams ? await searchParams : {};
+  const token = sParams?.token;
+
+  let context = await getCurrentContext();
+
+  if (!context && token) {
+    const tokenHash = hashSessionToken(token);
+    const session = await prisma.userSession.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (session && session.expiresAt > new Date() && session.user.isActive) {
+      const cookieStore = await cookies();
+      cookieStore.set(SESSION_COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 30 * 24 * 60 * 60,
+      });
+      context = await resolveSessionContext(token);
+    }
+  }
 
   if (!context) {
     redirect("/login");

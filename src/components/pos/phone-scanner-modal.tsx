@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n/context";
+import { createScannerSessionTokenAction } from "@/app/actions/auth";
 import {
   Smartphone,
   X,
@@ -12,6 +13,7 @@ import {
   QrCode,
   ShieldCheck,
   Zap,
+  Sparkles,
 } from "lucide-react";
 
 interface PhoneScannerModalProps {
@@ -23,11 +25,28 @@ interface PhoneScannerModalProps {
 export function PhoneScannerModal({ isOpen, onClose, shopSlug }: PhoneScannerModalProps) {
   const { t, language } = useLanguage();
   const [copied, setCopied] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoading(true);
+      createScannerSessionTokenAction(shopSlug)
+        .then((res) => {
+          if (res.success && res.token) {
+            setToken(res.token);
+          }
+        })
+        .finally(() => setIsLoading(false));
+    }
+  }, [isOpen, shopSlug]);
 
   if (!isOpen) return null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const scannerUrl = `${origin}/${shopSlug}/scan`;
+  const scannerUrl = token
+    ? `${origin}/${shopSlug}/scan?token=${token}`
+    : `${origin}/${shopSlug}/scan`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scannerUrl)}`;
 
   const handleCopy = () => {
@@ -44,15 +63,16 @@ export function PhoneScannerModal({ isOpen, onClose, shopSlug }: PhoneScannerMod
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/70">
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
               <Smartphone className="h-5 w-5" />
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-sm">
-                {t("phoneScannerModalTitle")}
+                {t("phoneCameraScannerBtn")}
               </h3>
-              <p className="text-[11px] text-slate-500 font-medium">
-                {language === "am" ? "የስልክ ባርኮድ መቃኛ ሊንክ" : "Dedicated Mobile Scanner Link"}
+              <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                {t("instantAccessNoLogin")}
               </p>
             </div>
           </div>
@@ -66,21 +86,27 @@ export function PhoneScannerModal({ isOpen, onClose, shopSlug }: PhoneScannerMod
 
         {/* Modal Body */}
         <div className="p-5 flex flex-col items-center text-center space-y-4">
-          <p className="text-xs text-slate-600 leading-relaxed max-w-xs">
-            {t("phoneScannerModalDesc")}
+          <p className="text-xs text-slate-600 leading-relaxed max-w-xs font-medium">
+            {t("scanQrInstantInstruction")}
           </p>
 
           {/* QR Code Container */}
-          <div className="p-3 bg-white border-2 border-dashed border-blue-200 rounded-2xl shadow-inner flex flex-col items-center">
-            <img
-              src={qrCodeUrl}
-              alt="Scan QR code with phone"
-              width={180}
-              height={180}
-              className="rounded-lg shadow-sm"
-            />
-            <div className="flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-blue-600">
-              <QrCode className="h-3.5 w-3.5" />
+          <div className="p-3 bg-white border-2 border-dashed border-blue-300 rounded-2xl shadow-inner flex flex-col items-center">
+            {isLoading ? (
+              <div className="w-[180px] h-[180px] flex items-center justify-center text-slate-400 text-xs font-semibold">
+                {t("loading")}
+              </div>
+            ) : (
+              <img
+                src={qrCodeUrl}
+                alt="Scan QR code with phone"
+                width={180}
+                height={180}
+                className="rounded-lg shadow-sm"
+              />
+            )}
+            <div className="flex items-center gap-1.5 mt-2.5 text-[11px] font-bold text-blue-600">
+              <QrCode className="h-4 w-4" />
               <span>{t("scanQrWithPhone")}</span>
             </div>
           </div>
@@ -121,25 +147,25 @@ export function PhoneScannerModal({ isOpen, onClose, shopSlug }: PhoneScannerMod
 
           {/* Feature Highlights */}
           <div className="w-full grid grid-cols-2 gap-2 text-left pt-1">
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-2">
-              <Zap className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-start gap-2">
+              <Zap className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
               <div className="text-[11px]">
-                <div className="font-bold text-slate-800">
-                  {language === "am" ? "ፈጣን ሽያጭ" : "Instant Deduction"}
+                <div className="font-bold text-emerald-900">
+                  {language === "am" ? "ያለ ፓስዎርድ ይከፍታል" : "Instant Authentication"}
                 </div>
-                <div className="text-slate-500 text-[10px]">
-                  {language === "am" ? "ወዲያው ከክምችት ይቀንሳል" : "Real-time stock deduction"}
+                <div className="text-emerald-700 text-[10px]">
+                  {language === "am" ? "በቀጥታ ስልኩን ያገናኛል" : "Zero login required on phone"}
                 </div>
               </div>
             </div>
-            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-start gap-2">
-              <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+            <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-100 flex items-start gap-2">
+              <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
               <div className="text-[11px]">
-                <div className="font-bold text-slate-800">
-                  {language === "am" ? "ባለቤት እና ሠራተኛ" : "Owner & Staff"}
+                <div className="font-bold text-blue-900">
+                  {language === "am" ? "ፈጣን ሽያጭና ቅነሳ" : "Live Stock Deduction"}
                 </div>
-                <div className="text-slate-500 text-[10px]">
-                  {language === "am" ? "በሁለቱም ይሰራል" : "Works on both roles"}
+                <div className="text-blue-700 text-[10px]">
+                  {language === "am" ? "ወዲያው ከስቶክ ይቀንሳል" : "Real-time inventory deduction"}
                 </div>
               </div>
             </div>

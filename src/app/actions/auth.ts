@@ -11,7 +11,8 @@ import {
   validateRecoveryToken,
   consumeRecoveryToken,
 } from "@/lib/auth/service";
-import { SESSION_COOKIE_NAME, SESSION_DURATION_DAYS } from "@/lib/auth/session";
+import { SESSION_COOKIE_NAME, SESSION_DURATION_DAYS, generateSessionToken, hashSessionToken } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 
 
@@ -173,6 +174,37 @@ export async function resetPasswordAction(prevState: any, formData: FormData): P
       success: false,
       error: err.message || "Failed to reset password.",
     };
+  }
+}
+
+export async function createScannerSessionTokenAction(shopSlug: string): Promise<{
+  success: boolean;
+  token?: string;
+  error?: string;
+}> {
+  const context = await getCurrentContext();
+  if (!context) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  try {
+    const rawToken = generateSessionToken();
+    const tokenHash = hashSessionToken(rawToken);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days phone scanner validity
+
+    await prisma.userSession.create({
+      data: {
+        userId: context.user.id,
+        tokenHash,
+        activeShopId: context.shopId,
+        expiresAt,
+      },
+    });
+
+    return { success: true, token: rawToken };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to generate scanner token." };
   }
 }
 

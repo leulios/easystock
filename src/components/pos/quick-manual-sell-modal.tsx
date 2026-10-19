@@ -46,6 +46,7 @@ interface QuickManualSellModalProps {
     outstandingCredit: number;
   }>;
   currency: string;
+  onOpenPhoneScanner?: () => void;
 }
 
 export function QuickManualSellModal({
@@ -54,6 +55,7 @@ export function QuickManualSellModal({
   products,
   customers,
   currency,
+  onOpenPhoneScanner,
 }: QuickManualSellModalProps) {
   const router = useRouter();
   const { t, language } = useLanguage();
@@ -195,6 +197,30 @@ export function QuickManualSellModal({
               <span>{errorMessage}</span>
             </div>
           )}
+
+          {/* Phone Camera Scanner Link Banner */}
+          <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <Smartphone className="h-4 w-4 text-blue-600 shrink-0" />
+              <span className="text-blue-900 font-medium">
+                {language === "am"
+                  ? "የስልክዎን ካሜራ እንደ ባርኮድ መቃኛ መጠቀም ይፈልጋሉ?"
+                  : "Want to scan barcodes using your phone camera?"}
+              </span>
+            </div>
+            {onOpenPhoneScanner && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPhoneScanner();
+                }}
+                className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg shadow-xs shrink-0"
+              >
+                {language === "am" ? "የስልክ መቃኛ ክፈት" : "Open Phone Scanner"}
+              </button>
+            )}
+          </div>
 
           {/* Step 1: Search by Barcode or Name */}
           <div className="space-y-1.5">

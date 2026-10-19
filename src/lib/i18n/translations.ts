@@ -107,6 +107,16 @@ export interface Translations {
   startSellingDesc: string;
   openPOS: string;
   openScanner: string;
+  phoneCameraScannerBtn: string;
+  instantAccessNoLogin: string;
+  scanQrInstantInstruction: string;
+
+  // Quick Customer Creation
+  addNewCustomer: string;
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  saveAndSelectCustomer: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -217,6 +227,16 @@ export const translations: Record<Language, Translations> = {
     startSellingDesc: "Launch cash register or use your phone camera to scan barcodes and sell items instantly.",
     openPOS: "Open Cash Register (POS)",
     openScanner: "Open Phone Scanner",
+    phoneCameraScannerBtn: "Phone Camera Scanner",
+    instantAccessNoLogin: "Instant Access (No Login Required)",
+    scanQrInstantInstruction: "Point your phone camera at this QR code to start scanning immediately without typing passwords.",
+
+    // Quick Customer Creation
+    addNewCustomer: "+ Add Customer",
+    customerName: "Customer Full Name",
+    customerPhone: "Phone Number (Optional)",
+    customerAddress: "Address / Kebele (Optional)",
+    saveAndSelectCustomer: "Save & Select for Sale",
   },
 
   am: {
@@ -326,5 +346,15 @@ export const translations: Record<Language, Translations> = {
     startSellingDesc: "የገንዘብ መቀበያውን ይክፈቱ ወይም ስልክዎን እንደ ባርኮድ መቃኛ በመጠቀም ዕቃዎችን ይሽጡና ከክምችት ይቀንሱ።",
     openPOS: "የገንዘብ መቀበያ (መሸጫ)",
     openScanner: "የስልክ ባርኮድ መቃኛ",
+    phoneCameraScannerBtn: "የስልክ ካሜራ ባርኮድ መቃኛ",
+    instantAccessNoLogin: "ቀጥታ መክፈቻ (ፓስዎርድ አይጠይቅም)",
+    scanQrInstantInstruction: "ይህንን ኪውአር (QR) ኮድ በስልክዎ ካሜራ ሲያነጣጥሩ ያለ ምንም ፓስዎርድ የስልኩ ባርኮድ መቃኛ ወዲያው ይከፈታል።",
+
+    // Quick Customer Creation
+    addNewCustomer: "+ አዲስ ደንበኛ",
+    customerName: "የደንበኛው ሙሉ ስም",
+    customerPhone: "ስልክ ቁጥር (አስገዳጅ አይደለም)",
+    customerAddress: "አድራሻ / ሰፈር (አስገዳጅ አይደለም)",
+    saveAndSelectCustomer: "መዝግብና ለዚህ ሽያጭ ምረጥ",
   },
 };

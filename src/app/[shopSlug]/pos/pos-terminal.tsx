@@ -20,13 +20,13 @@ import {
   AlertCircle,
   Package,
   Users,
-  Camera,
   Zap,
+  UserPlus,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { CameraScannerModal } from "@/components/pos/camera-scanner-modal";
 import { PhoneScannerModal } from "@/components/pos/phone-scanner-modal";
 import { QuickManualSellModal } from "@/components/pos/quick-manual-sell-modal";
+import { QuickCustomerModal } from "@/components/pos/quick-customer-modal";
 import { useLanguage } from "@/lib/i18n/context";
 
 interface POSProduct {
@@ -77,6 +77,7 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [customersList, setCustomersList] = useState(customers);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
@@ -85,9 +86,9 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [completedSale, setCompletedSale] = useState<any>(null);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [isQuickManualSellOpen, setIsQuickManualSellOpen] = useState(false);
+  const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
 
   // Generate a fresh idempotency key when cart transitions from empty to having items
   useEffect(() => {
@@ -252,39 +253,27 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
               <Barcode className="h-5 w-5 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
             </div>
 
-            {/* Quick 1-Item Sell Modal Trigger */}
+            {/* Phone Camera Scanner Modal Trigger (Primary Reliable Scanner) */}
             <Button
               type="button"
-              onClick={() => setIsQuickManualSellOpen(true)}
-              className="h-10 px-3 bg-amber-500 hover:bg-amber-600 text-white flex items-center gap-1.5 shrink-0 text-xs font-bold shadow-sm"
-              title={t("quickManualSell")}
-            >
-              <Zap className="h-4 w-4" />
-              <span>{language === "am" ? "ፈጣን መሸጫ" : "Quick Sell"}</span>
-            </Button>
-
-            {/* Phone Scanner Modal Trigger */}
-            <Button
-              type="button"
-              variant="outline"
               onClick={() => setIsPhoneModalOpen(true)}
-              className="h-10 px-3 bg-blue-50/80 hover:bg-blue-100 border-blue-200 text-blue-700 flex items-center gap-1.5 shrink-0 text-xs font-bold shadow-sm"
+              className="h-10 px-3.5 bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2 shrink-0 text-xs font-bold rounded-lg shadow-sm"
               title={t("openPhoneScanner")}
             >
-              <Smartphone className="h-4 w-4 text-blue-600" />
-              <span>{language === "am" ? "የስልክ መቃኛ" : "Phone Scanner"}</span>
+              <Smartphone className="h-4 w-4 text-amber-300" />
+              <span>{language === "am" ? "የስልክ ካሜራ መቃኛ" : "Phone Camera Scanner"}</span>
             </Button>
 
-            {/* Local Webcam/Device Camera */}
+            {/* Quick 1-Item Manual Sell (By Code or Name) */}
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsCameraOpen(true)}
-              className="h-10 px-3 bg-white hover:bg-slate-50 border-slate-300 text-slate-700 flex items-center gap-1.5 shrink-0 text-xs font-semibold shadow-sm"
-              title="Scan with device camera"
+              onClick={() => setIsQuickManualSellOpen(true)}
+              className="h-10 px-3 bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 flex items-center gap-1.5 shrink-0 text-xs font-bold rounded-lg shadow-sm"
+              title={t("quickManualSell")}
             >
-              <Camera className="h-4 w-4 text-slate-600" />
-              <span className="hidden md:inline">{language === "am" ? "ካሜራ" : "Camera"}</span>
+              <Zap className="h-4 w-4 text-amber-600" />
+              <span>{language === "am" ? "በኮድ/በስም መሸጫ" : "Quick Manual Sell"}</span>
             </Button>
           </div>
 
@@ -384,18 +373,29 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
           )}
         </div>
 
-        {/* Customer Account Selector */}
+        {/* Customer Account Selector with + Add Customer Button */}
         <div className="p-3 bg-slate-50 border-b border-slate-200">
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-            <Users className="h-3 w-3 text-slate-400" /> {t("selectCustomer")}
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <Users className="h-3 w-3 text-slate-400" /> {t("selectCustomer")}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsNewCustomerModalOpen(true)}
+              className="text-[11px] font-bold text-purple-600 hover:text-purple-800 flex items-center gap-1 hover:underline"
+              title={t("addNewCustomer")}
+            >
+              <UserPlus className="h-3.5 w-3.5 text-purple-600" />
+              <span>{t("addNewCustomer")}</span>
+            </button>
+          </div>
           <select
             value={selectedCustomerId}
             onChange={(e) => setSelectedCustomerId(e.target.value)}
             className="w-full h-8 px-2 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
           >
             <option value="">{t("walkInCustomer")}</option>
-            {customers.map((c) => (
+            {customersList.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name} {c.phone ? `(${c.phone})` : ""}{" "}
                 {c.outstandingCredit > 0
@@ -608,12 +608,6 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
         currency={shop.currency}
       />
 
-      <CameraScannerModal
-        isOpen={isCameraOpen}
-        onClose={() => setIsCameraOpen(false)}
-        onScan={(code) => handleSearchChange(code)}
-      />
-
       <PhoneScannerModal
         isOpen={isPhoneModalOpen}
         onClose={() => setIsPhoneModalOpen(false)}
@@ -624,8 +618,18 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
         isOpen={isQuickManualSellOpen}
         onClose={() => setIsQuickManualSellOpen(false)}
         products={products}
-        customers={customers}
+        customers={customersList}
         currency={shop.currency}
+        onOpenPhoneScanner={() => setIsPhoneModalOpen(true)}
+      />
+
+      <QuickCustomerModal
+        isOpen={isNewCustomerModalOpen}
+        onClose={() => setIsNewCustomerModalOpen(false)}
+        onCustomerCreated={(newCust) => {
+          setCustomersList((prev) => [newCust, ...prev]);
+          setSelectedCustomerId(newCust.id);
+        }}
       />
     </div>
   );
