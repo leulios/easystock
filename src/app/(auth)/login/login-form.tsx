@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 
-export function LoginForm() {
+interface LoginFormProps {
+  redirectUrl?: string;
+}
+
+export function LoginForm({ redirectUrl }: LoginFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -28,7 +32,8 @@ export function LoginForm() {
           setFieldErrors(result.fieldErrors);
         }
       } else {
-        router.push(result.redirectUrl || "/");
+        const dest = redirectUrl && redirectUrl.startsWith("/") ? redirectUrl : (result.redirectUrl || "/");
+        router.push(dest);
         router.refresh();
       }
 

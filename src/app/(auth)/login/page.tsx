@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { LoginForm } from "./login-form";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ redirect?: string }>;
+}) {
+  const resolvedParams = await searchParams;
+  const redirectUrl = resolvedParams?.redirect;
+
   return (
     <div className="min-h-screen flex flex-col justify-center items-center px-4 py-12 bg-slate-50">
       <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
@@ -15,9 +22,14 @@ export default function LoginPage() {
           <p className="text-sm text-slate-500 mt-1">
             Access your multi-tenant shop management terminal
           </p>
+          {redirectUrl && (
+            <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-700">
+              Sign in to continue to Quick Scanner
+            </div>
+          )}
         </div>
 
-        <LoginForm />
+        <LoginForm redirectUrl={redirectUrl} />
 
         <div className="mt-6 text-center text-xs text-slate-500">
           New to EasyStock?{" "}

@@ -40,7 +40,7 @@ export default async function ScanPage({ params, searchParams }: ScanPageProps) 
   }
 
   if (!context) {
-    redirect("/login");
+    redirect(`/login?redirect=/${shopSlug}/scan`);
   }
 
   const [productsResult, shop, customers] = await Promise.all([

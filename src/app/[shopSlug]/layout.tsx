@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
+import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
 
 interface ShopLayoutProps {
   children: React.ReactNode;
@@ -59,10 +60,16 @@ export default async function ShopLayout({ children, params }: ShopLayoutProps) 
           user={context.user}
           role={context.role}
         />
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3.5 sm:p-6 md:p-8 pb-24 md:pb-8 max-w-7xl w-full mx-auto overflow-x-hidden">
           {children}
         </main>
       </div>
+
+      <MobileBottomNav
+        shopId={currentShop.id}
+        role={context.role}
+        isPlatformAdmin={context.isPlatformAdmin}
+      />
     </div>
   );
 }

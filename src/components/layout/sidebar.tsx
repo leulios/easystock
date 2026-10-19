@@ -100,7 +100,7 @@ export function Sidebar({ shopId, role, isPlatformAdmin }: SidebarProps) {
 
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 min-h-screen">
+    <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col justify-between shrink-0 min-h-screen">
       <div className="p-4 space-y-6">
         <div className="flex items-center gap-2.5 px-2">
           <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">

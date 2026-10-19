@@ -187,8 +187,8 @@ export function InventoryClient({
         </button>
       </div>
 
-      {/* Stock Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Desktop Stock Table (hidden md:block) */}
+      <div className="hidden md:block bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
@@ -286,6 +286,98 @@ export function InventoryClient({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Stacked Stock Cards (md:hidden) */}
+      <div className="md:hidden space-y-3">
+        {filteredItems.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-2xl">
+            <Boxes className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+            <p className="font-semibold text-slate-700">No stock records found</p>
+          </div>
+        ) : (
+          filteredItems.map((item) => {
+            const lineValuation = item.currentStock * item.costPrice;
+            return (
+              <div
+                key={item.variantId}
+                className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-bold text-slate-900 text-sm truncate">{item.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="font-mono text-xs text-slate-400">{item.sku}</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-medium">
+                        {item.category}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <div
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                        item.currentStock <= 0
+                          ? "bg-rose-100 text-rose-800"
+                          : item.isLowStock
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-emerald-50 text-emerald-800"
+                      }`}
+                    >
+                      {item.isLowStock && <AlertTriangle className="h-3 w-3 text-amber-600" />}
+                      <span>
+                        {item.currentStock} {item.unitOfMeasure}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-1">
+                      Alert &le; {item.reorderLevel}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">
+                    Valuation: <strong className="text-slate-900">{formatCurrency(lineValuation, currency)}</strong>
+                  </span>
+                  <span className="text-slate-500">
+                    Cost: {formatCurrency(item.costPrice, currency)}
+                  </span>
+                </div>
+
+                <div className="pt-1 flex items-center gap-2">
+                  {siblingShops && siblingShops.length > 1 && item.currentStock > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setTransferVariantId(item.variantId);
+                        setIsTransferModalOpen(true);
+                      }}
+                      className="flex-1 h-9 text-xs font-semibold"
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5 text-blue-600 mr-1.5" /> Transfer
+                    </Button>
+                  )}
+
+                  <Button
+                    size="sm"
+                    onClick={() =>
+                      setSelectedProduct({
+                        variantId: item.variantId,
+                        name: item.name,
+                        sku: item.sku,
+                        currentStock: item.currentStock,
+                      })
+                    }
+                    className="flex-1 h-9 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" /> Adjust Stock
+                  </Button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <AdjustModal

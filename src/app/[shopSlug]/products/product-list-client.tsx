@@ -139,8 +139,8 @@ export function ProductListClient({
         </div>
       </div>
 
-      {/* Products Table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Desktop Products Table (hidden md:block) */}
+      <div className="hidden md:block bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
@@ -229,6 +229,91 @@ export function ProductListClient({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Stacked Product Cards (md:hidden) */}
+      <div className="md:hidden space-y-3">
+        {filteredProducts.length === 0 ? (
+          <div className="p-8 text-center text-slate-500 bg-white border border-slate-200 rounded-2xl">
+            <Package className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+            <p className="font-semibold text-slate-700">No products found</p>
+            <p className="text-xs text-slate-400 mt-1">Try adjusting your search or category filter</p>
+          </div>
+        ) : (
+          filteredProducts.map((product) => (
+            <div
+              key={product.id}
+              className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm space-y-3"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-bold text-slate-900 text-sm truncate">{product.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="font-mono text-xs text-slate-400">{product.sku}</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-600 font-medium">
+                      {product.category}
+                    </span>
+                  </div>
+                  {product.barcode && (
+                    <div className="text-[11px] font-mono text-slate-400 mt-0.5 flex items-center gap-1">
+                      <Barcode className="h-3 w-3" /> {product.barcode}
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-right shrink-0">
+                  <div
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${
+                      product.currentStock <= 0
+                        ? "bg-rose-100 text-rose-800"
+                        : product.isLowStock
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-emerald-50 text-emerald-800"
+                    }`}
+                  >
+                    {product.isLowStock && <AlertTriangle className="h-3 w-3 text-amber-600" />}
+                    <span>{product.currentStock} in stock</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 mt-1">
+                    Min alert: {product.reorderLevel}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-slate-400 text-[11px]">Selling Price: </span>
+                  <span className="text-base font-extrabold text-slate-900">
+                    {formatCurrency(product.sellingPrice, currency)}
+                  </span>
+                </div>
+                <div className="text-slate-500 text-right">
+                  Cost: {formatCurrency(product.costPrice, currency)}
+                </div>
+              </div>
+
+              <div className="pt-1 flex items-center justify-end gap-2 border-t border-slate-100">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBarcodeProduct(product)}
+                  className="h-8 px-3 text-xs font-semibold"
+                >
+                  <Barcode className="h-3.5 w-3.5 mr-1" /> Label
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleArchive(product.id, product.name)}
+                  disabled={isPending}
+                  className="h-8 px-3 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Archive
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <NewProductModal

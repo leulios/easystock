@@ -89,6 +89,7 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
   const [isPhoneModalOpen, setIsPhoneModalOpen] = useState(false);
   const [isQuickManualSellOpen, setIsQuickManualSellOpen] = useState(false);
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"catalog" | "cart">("catalog");
 
   // Generate a fresh idempotency key when cart transitions from empty to having items
   useEffect(() => {
@@ -168,6 +169,7 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
   };
 
   // Financial calculations
+  const totalItemsInCart = cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cart.reduce((sum, item) => sum + item.quantity * item.sellingPrice, 0);
   const totalDiscount = cart.reduce((sum, item) => sum + item.discount, 0);
   const taxableAmount = Math.max(0, subtotal - totalDiscount);
@@ -234,9 +236,46 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
   });
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-6.5rem)]">
-      {/* Left Pane: Product Catalog Grid */}
-      <div className="flex-1 flex flex-col min-w-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div className="flex flex-col gap-3">
+      {/* Mobile Tab Switcher (< lg) */}
+      <div className="lg:hidden flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setMobileTab("catalog")}
+          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+            mobileTab === "catalog"
+              ? "bg-white text-blue-700 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <Package className="h-4 w-4" />
+          <span>{language === "am" ? "ዕቃዎች ዝርዝር" : "Catalog"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMobileTab("cart")}
+          className={`flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 relative ${
+            mobileTab === "cart"
+              ? "bg-white text-blue-700 shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          <ShoppingCart className="h-4 w-4" />
+          <span>
+            {t("cart")} ({totalItemsInCart})
+          </span>
+          {totalItemsInCart > 0 && (
+            <span className="ml-1 text-[11px] font-mono font-extrabold text-blue-600">
+              • {formatCurrency(grandTotal, shop.currency)}
+            </span>
+          )}
+        </button>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-6.5rem)]">
+        {/* Left Pane: Product Catalog Grid */}
+        <div className={`flex-1 flex flex-col min-w-0 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden ${mobileTab === "cart" ? "hidden lg:flex" : "flex"}`}>
         {/* Search & Category Filter */}
         <div className="p-4 border-b border-slate-200 space-y-3">
           <div className="flex flex-wrap sm:flex-nowrap gap-2">
@@ -354,24 +393,32 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
         </div>
       </div>
 
-      {/* Right Pane: Active Cart & Tender Section */}
-      <div className="w-full lg:w-96 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden shrink-0">
-        <div className="p-3 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 text-blue-600" />
-            <h2 className="font-bold text-slate-900 text-sm">
-              {t("cart")} ({cart.length})
-            </h2>
+        {/* Right Pane: Active Cart & Tender Section */}
+        <div className={`w-full lg:w-96 flex flex-col bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden shrink-0 ${mobileTab === "catalog" ? "hidden lg:flex" : "flex"}`}>
+          <div className="p-3 border-b border-slate-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMobileTab("catalog")}
+                className="lg:hidden text-xs text-blue-600 font-bold hover:underline flex items-center gap-1 mr-1"
+                title="Back to Catalog"
+              >
+                &larr; {language === "am" ? "ዕቃዎች" : "Catalog"}
+              </button>
+              <ShoppingCart className="h-4 w-4 text-blue-600" />
+              <h2 className="font-bold text-slate-900 text-sm">
+                {t("cart")} ({cart.length})
+              </h2>
+            </div>
+            {cart.length > 0 && (
+              <button
+                onClick={() => setCart([])}
+                className="text-xs text-rose-600 hover:underline font-medium"
+              >
+                {t("clearCart")}
+              </button>
+            )}
           </div>
-          {cart.length > 0 && (
-            <button
-              onClick={() => setCart([])}
-              className="text-xs text-rose-600 hover:underline font-medium"
-            >
-              {t("clearCart")}
-            </button>
-          )}
-        </div>
 
         {/* Customer Account Selector with + Add Customer Button */}
         <div className="p-3 bg-slate-50 border-b border-slate-200">
@@ -599,6 +646,30 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
           </Button>
         </div>
       </div>
+    </div>
+
+      {/* Sticky Mobile Cart Bar when viewing Catalog */}
+      {mobileTab === "catalog" && totalItemsInCart > 0 && (
+        <div className="lg:hidden fixed bottom-16 left-3 right-3 z-20">
+          <button
+            type="button"
+            onClick={() => setMobileTab("cart")}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-xl flex items-center justify-between active:scale-[0.99] transition-transform"
+          >
+            <div className="flex items-center gap-2">
+              <span className="bg-blue-800 text-white text-xs px-2 py-0.5 rounded-full font-mono">
+                {totalItemsInCart} {language === "am" ? "ዕቃዎች" : "items"}
+              </span>
+              <span className="text-sm font-semibold">
+                {language === "am" ? "ወደ ሂሳብ / ቅርጫት ሂድ" : "View Cart & Checkout"}
+              </span>
+            </div>
+            <span className="font-mono text-base font-extrabold">
+              {formatCurrency(grandTotal, shop.currency)} &rarr;
+            </span>
+          </button>
+        </div>
+      )}
 
       <ReceiptModal
         isOpen={Boolean(completedSale)}

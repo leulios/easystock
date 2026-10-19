@@ -25,8 +25,8 @@ interface HeaderProps {
 
 export function Header({ currentShop, availableShops, user, role }: HeaderProps) {
   return (
-    <header className="h-16 border-b border-slate-200 bg-white px-6 flex items-center justify-between sticky top-0 z-30">
-      <div className="w-64 max-w-xs">
+    <header className="h-14 sm:h-16 border-b border-slate-200 bg-white px-3 sm:px-6 flex items-center justify-between sticky top-0 z-30">
+      <div className="flex-1 max-w-[220px] sm:max-w-xs">
         <ShopSwitcher
           currentShopId={currentShop.id}
           currentShopName={currentShop.name}
@@ -34,7 +34,7 @@ export function Header({ currentShop, availableShops, user, role }: HeaderProps)
         />
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <LanguageSwitcher />
         <UserNav user={user} role={role} />
       </div>
