@@ -38,6 +38,7 @@ export default async function DedicatedRootScanPage() {
     barcode: p.barcode,
     category: p.category,
     sellingPrice: p.sellingPrice,
+    costPrice: p.costPrice,
     currentStock: p.currentStock,
     unit: p.unitOfMeasure,
   }));

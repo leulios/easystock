@@ -360,3 +360,142 @@ export async function transferStockBetweenShops(
   });
 }
 
+export interface BatchStockInItem {
+  variantId: string;
+  quantity: number;
+  costPrice?: number;
+}
+
+export interface BatchStockInInput {
+  items: BatchStockInItem[];
+  notes?: string;
+}
+
+export async function batchReceiveStock(context: TenantContext, input: BatchStockInInput) {
+  const { organizationId, shopId, user, role, permissions } = context;
+
+  // 1. Authorization check
+  const isAuthorized = role === ShopRole.SHOP_OWNER || permissions.canAdjustStock;
+  if (!isAuthorized) {
+    throw new Error("You do not have permission to receive inventory stock.");
+  }
+
+  // 2. Validate input
+  if (!input.items || input.items.length === 0) {
+    throw new Error("At least one product item is required for stock receiving.");
+  }
+
+  for (const item of input.items) {
+    if (!item.variantId) {
+      throw new Error("Valid variantId is required for all items.");
+    }
+    if (!item.quantity || item.quantity <= 0) {
+      throw new Error(`Quantity must be a positive integer. Received: ${item.quantity}`);
+    }
+  }
+
+  // 3. Shop validation
+  const shop = await prisma.shop.findUnique({
+    where: { id: shopId },
+    select: { isActive: true, suspensionReason: true, name: true },
+  });
+
+  if (shop && shop.isActive === false) {
+    throw new Error(
+      `This shop is currently suspended: "${shop.suspensionReason || "Administrative hold"}". Operations are halted.`
+    );
+  }
+
+  // 4. Atomic execution
+  return prisma.$transaction(async (tx) => {
+    const batchId = crypto.randomUUID();
+    const updatedItems = [];
+
+    for (const item of input.items) {
+      const variant = await tx.productVariant.findUnique({
+        where: { id: item.variantId },
+        include: { product: true },
+      });
+
+      if (!variant || variant.product.organizationId !== organizationId) {
+        throw new Error(`Product variant not found or access denied: ${item.variantId}`);
+      }
+
+      const inventory = await tx.inventoryItem.upsert({
+        where: {
+          shopId_variantId: {
+            shopId,
+            variantId: item.variantId,
+          },
+        },
+        update: {},
+        create: {
+          shopId,
+          variantId: item.variantId,
+          quantity: 0,
+        },
+      });
+
+      const resultingBalance = inventory.quantity + item.quantity;
+      const unitCost = item.costPrice !== undefined ? item.costPrice : Number(variant.costPrice);
+
+      await tx.inventoryItem.update({
+        where: { id: inventory.id },
+        data: {
+          quantity: resultingBalance,
+          version: { increment: 1 },
+        },
+      });
+
+      const movement = await tx.stockMovement.create({
+        data: {
+          shopId,
+          variantId: item.variantId,
+          movementType: MovementType.PURCHASE_RECEIPT,
+          quantityDelta: item.quantity,
+          resultingBalance,
+          unitCost,
+          referenceType: "SCANNER_STOCK_IN",
+          referenceId: batchId,
+          notes: input.notes || "Received via Quick Scanner",
+          performedBy: user.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          shopId,
+          userId: user.id,
+          action: "STOCK_RECEIVED",
+          entityType: "InventoryItem",
+          entityId: inventory.id,
+          previousData: { quantity: inventory.quantity },
+          newData: {
+            quantity: resultingBalance,
+            delta: item.quantity,
+            batchId,
+            unitCost,
+          },
+        },
+      });
+
+      updatedItems.push({
+        variantId: item.variantId,
+        productName: variant.product.name,
+        previousStock: inventory.quantity,
+        newStock: resultingBalance,
+        quantityAdded: item.quantity,
+      });
+    }
+
+    return {
+      batchId,
+      itemsCount: updatedItems.length,
+      totalUnits: input.items.reduce((sum, it) => sum + it.quantity, 0),
+      items: updatedItems,
+    };
+  });
+}
+
+

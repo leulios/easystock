@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { NewExpenseModal } from "./new-expense-modal";
 import { Receipt, Plus, Filter, Calendar } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface ExpenseItem {
   id: string;
@@ -30,6 +31,7 @@ export function ExpensesClient({
   currency,
 }: ExpensesClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [expenses] = useState<ExpenseItem[]>(initialExpenses);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -41,15 +43,15 @@ export function ExpensesClient({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Operating Expenses
+            {t("expensesTitle")}
           </h1>
           <p className="text-sm text-slate-500">
-            Track business operational costs, store rent, utilities, and wages
+            {t("expensesSubtitle")}
           </p>
         </div>
 
         <Button onClick={() => setIsModalOpen(true)} className="self-start">
-          <Plus className="h-4 w-4 mr-1.5" /> Record Expense
+          <Plus className="h-4 w-4 mr-1.5" /> {t("addExpenseBtn")}
         </Button>
       </div>
 
@@ -58,7 +60,7 @@ export function ExpensesClient({
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Expenses on Record
+              {language === "am" ? "ጠቅላላ የተመዘገቡ ወጪዎች" : "Total Expenses on Record"}
             </p>
             <p className="text-2xl font-extrabold text-rose-600 mt-1">
               {formatCurrency(totalAmount, currency)}
@@ -72,10 +74,10 @@ export function ExpensesClient({
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Expense Records Count
+              {t("expenseRecordsCount")}
             </p>
             <p className="text-2xl font-extrabold text-slate-900 mt-1">
-              {expenses.length} entries
+              {expenses.length} {language === "am" ? "መዝገቦች" : "entries"}
             </p>
           </div>
           <div className="h-11 w-11 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
@@ -92,15 +94,15 @@ export function ExpensesClient({
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="w-full h-10 px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
           >
-            <option value="">All Categories</option>
-            <option value="Rent">Rent</option>
-            <option value="Utilities">Utilities</option>
-            <option value="Salaries">Salaries</option>
-            <option value="Supplies">Supplies</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Insurance">Insurance</option>
-            <option value="Other">Other</option>
+            <option value="">{t("allCategories")}</option>
+            <option value="Rent">{language === "am" ? "ኪራይ (Rent)" : "Rent"}</option>
+            <option value="Utilities">{language === "am" ? "መብራትና ውሃ (Utilities)" : "Utilities"}</option>
+            <option value="Salaries">{language === "am" ? "ደመወዝ (Salaries)" : "Salaries"}</option>
+            <option value="Supplies">{language === "am" ? "የሱቅ ዕቃዎች (Supplies)" : "Supplies"}</option>
+            <option value="Marketing">{language === "am" ? "ማስታወቂያ (Marketing)" : "Marketing"}</option>
+            <option value="Maintenance">{language === "am" ? "ጥገና (Maintenance)" : "Maintenance"}</option>
+            <option value="Insurance">{language === "am" ? "ኢንሹራንስ (Insurance)" : "Insurance"}</option>
+            <option value="Other">{language === "am" ? "ሌላ (Other)" : "Other"}</option>
           </select>
         </div>
       </div>
@@ -111,10 +113,10 @@ export function ExpensesClient({
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Description</th>
-                <th className="py-3 px-4 text-right">Amount</th>
+                <th className="py-3 px-4">{t("date")}</th>
+                <th className="py-3 px-4">{t("category")}</th>
+                <th className="py-3 px-4">{t("expenseDescription")}</th>
+                <th className="py-3 px-4 text-right">{t("expenseAmount")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -122,7 +124,7 @@ export function ExpensesClient({
                 <tr>
                   <td colSpan={4} className="py-12 text-center text-slate-500">
                     <Receipt className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                    <p className="font-medium text-slate-700">No expense records found</p>
+                    <p className="font-medium text-slate-700">{t("noExpensesFound")}</p>
                   </td>
                 </tr>
               ) : (

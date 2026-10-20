@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef, useTransition } from "react";
 import { formatCurrency } from "@/lib/decimal";
-import { quickSellItemAction } from "@/app/actions/sales";
-import { adjustStockAction } from "@/app/actions/inventory";
+import { checkoutSaleAction } from "@/app/actions/sales";
+import { batchStockInAction } from "@/app/actions/inventory";
 import { logoutAction } from "@/app/actions/auth";
 import { useLanguage } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
@@ -24,10 +24,15 @@ import {
   FlashlightOff,
   RefreshCw,
   LogOut,
-  ExternalLink,
-  ChevronRight,
+  ShoppingCart,
+  Trash2,
+  Printer,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Layers,
+  ArrowDownToLine,
   SlidersHorizontal,
-  Info,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -41,8 +46,20 @@ export interface ProductItem {
   barcode: string | null;
   category: string;
   sellingPrice: number;
+  costPrice?: number;
   currentStock: number;
   unit: string;
+}
+
+export interface SaleCartItem {
+  product: ProductItem;
+  quantity: number;
+}
+
+export interface StockInStagedItem {
+  product: ProductItem;
+  quantity: number;
+  costPrice: number;
 }
 
 interface MobileScannerClientProps {
@@ -55,7 +72,31 @@ interface MobileScannerClientProps {
 export function MobileScannerClient({ products, customers, shop, shopSlug }: MobileScannerClientProps) {
   const router = useRouter();
   const { t, language } = useLanguage();
+
+  // Primary Operational Mode: "sell" | "stock_in"
+  const [mode, setMode] = useState<"sell" | "stock_in">("sell");
+
+  // Input view tab: "camera" | "manual"
   const [activeTab, setActiveTab] = useState<"camera" | "manual">("camera");
+
+  // Multi-item Sale Cart state (Sales Mode)
+  const [saleCart, setSaleCart] = useState<SaleCartItem[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [tenderedAmount, setTenderedAmount] = useState<string>("");
+  const [completedSale, setCompletedSale] = useState<any>(null);
+
+  // Staged Receiving List state (Stock In Mode)
+  const [receivingList, setReceivingList] = useState<StockInStagedItem[]>([]);
+  const [receivingNotes, setReceivingNotes] = useState<string>("");
+  const [completedStockIn, setCompletedStockIn] = useState<{
+    batchId: string;
+    itemsCount: number;
+    totalUnits: number;
+  } | null>(null);
+
+  // Review Drawer / Modal open state
+  const [isReviewDrawerOpen, setIsReviewDrawerOpen] = useState<boolean>(false);
 
   // Camera scanner state
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
@@ -69,33 +110,26 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
   const lastScanCodeRef = useRef<string>("");
   const lastScanTimeRef = useRef<number>(0);
 
-  // Selected item state
-  const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  // Toast banner feedback
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" | "info" } | null>(null);
   const [notFoundCode, setNotFoundCode] = useState<string | null>(null);
-
-  // Scanned item action mode: "sell" | "adjust" | "info"
-  const [actionMode, setActionMode] = useState<"sell" | "adjust" | "info">("sell");
-
-  // Quick Sell state
-  const [quantity, setQuantity] = useState<number>(1);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-
-  // Stock Adjustment state
-  const [adjustType, setAdjustType] = useState<"ADD" | "DEDUCT">("ADD");
-  const [stockAdjustQty, setStockAdjustQty] = useState<number>(1);
-  const [stockAdjustReason, setStockAdjustReason] = useState<string>("Restock / New Shipment");
 
   // Search filter for manual mode
   const [manualQuery, setManualQuery] = useState<string>("");
 
-  // Server action transitions
+  // Action transitions
   const [isPending, startTransition] = useTransition();
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Show transient toast
+  const showToast = (text: string, type: "success" | "error" | "info" = "success") => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage((prev) => (prev?.text === text ? null : prev));
+    }, 2800);
+  };
 
   // Audio chime feedback
-  const playBeep = () => {
+  const playBeep = (freq = 880) => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
@@ -103,11 +137,11 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
       osc.connect(gain);
       gain.connect(audioCtx.destination);
       osc.type = "sine";
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
       gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.14);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
       osc.start();
-      osc.stop(audioCtx.currentTime + 0.14);
+      osc.stop(audioCtx.currentTime + 0.12);
     } catch {
       // Audio not permitted
     }
@@ -175,14 +209,10 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
       } catch {
         setHasTorch(false);
       }
-    } catch (err: any) {
+    } catch {
       setHasCamera(false);
       setIsCameraRunning(false);
-      setCameraError(
-        language === "am"
-          ? "የካሜራ ፈቃድ አልተገኘም። እባክዎ በስልክዎ ብሮውዘር የካሜራ ፈቃድ ይስጡ ወይም በስም/በኮድ ይፈልጉ።"
-          : "Camera access unavailable. Make sure permissions are granted or use manual lookup."
-      );
+      setCameraError(t("cameraError"));
     }
   };
 
@@ -212,7 +242,7 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     }
   };
 
-  // Switch tabs & manage camera lifecycle
+  // Manage camera lifecycle
   useEffect(() => {
     if (activeTab === "camera") {
       startCamera();
@@ -225,23 +255,53 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     };
   }, [activeTab]);
 
-  // Code detected handler with duplicate throttling
+  // Hardware Scanner Integration (USB / Bluetooth Keyboard Wedge)
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is intentionally typing inside an input field
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastKeyTime > 65) {
+        buffer = "";
+      }
+      lastKeyTime = now;
+
+      if (e.key === "Enter") {
+        if (buffer.length >= 3) {
+          e.preventDefault();
+          handleCodeDetected(buffer);
+          buffer = "";
+        }
+      } else if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mode, products, saleCart, receivingList]);
+
+  // Code detected handler with mode-specific handling and duplicate throttling
   const handleCodeDetected = (code: string) => {
     const now = Date.now();
     const cleanCode = code.trim();
     if (!cleanCode) return;
 
-    // Throttle same barcode if scanned within 2.5 seconds
-    if (lastScanCodeRef.current === cleanCode && now - lastScanTimeRef.current < 2500) {
+    // Throttle same barcode if scanned within 1.5 seconds to prevent accidental runaway
+    if (lastScanCodeRef.current === cleanCode && now - lastScanTimeRef.current < 1500) {
       return;
     }
     lastScanCodeRef.current = cleanCode;
     lastScanTimeRef.current = now;
-
-    playBeep();
-    if (typeof navigator !== "undefined" && navigator.vibrate) {
-      navigator.vibrate([70, 30, 70]);
-    }
 
     const matched = products.find(
       (p) =>
@@ -249,37 +309,138 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
         p.sku.toLowerCase() === cleanCode.toLowerCase()
     );
 
-    if (matched) {
-      setSelectedProduct(matched);
-      setNotFoundCode(null);
-      setQuantity(1);
-      setStockAdjustQty(1);
-      setStockAdjustReason("Restock / New Shipment");
-      setSuccessMessage(null);
-      setErrorMessage(null);
-    } else {
-      setSelectedProduct(null);
+    if (!matched) {
+      playBeep(440);
       setNotFoundCode(cleanCode);
-      setErrorMessage(
-        language === "am"
-          ? `ባርኮድ "${cleanCode}" የተመዘገበ ዕቃ አልተገኘም`
-          : `No product found matching barcode "${cleanCode}"`
+      showToast(`${t("unrecognizedBarcode")}: ${cleanCode}`, "error");
+      return;
+    }
+
+    setNotFoundCode(null);
+
+    if (mode === "sell") {
+      // SALES MODE: Add or Increment in Sale Cart
+      playBeep(880);
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate([60, 30, 60]);
+      }
+
+      setSaleCart((prev) => {
+        const existingIndex = prev.findIndex((item) => item.product.variantId === matched.variantId);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex].quantity += 1;
+          showToast(`+1 ${matched.name} (${updated[existingIndex].quantity} ${t("inStock")})`);
+          return updated;
+        } else {
+          showToast(`+1 ${matched.name}`);
+          return [...prev, { product: matched, quantity: 1 }];
+        }
+      });
+    } else {
+      // STOCK IN MODE: Add or Increment in Receiving Staging List
+      playBeep(1046.5); // C6 tone
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate([100]);
+      }
+
+      setReceivingList((prev) => {
+        const existingIndex = prev.findIndex((item) => item.product.variantId === matched.variantId);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex].quantity += 1;
+          showToast(`+1 ${matched.name} (${t("stockInItemAdded")}: ${updated[existingIndex].quantity})`);
+          return updated;
+        } else {
+          showToast(`${matched.name} ${t("stockInItemAdded")}`);
+          return [
+            ...prev,
+            {
+              product: matched,
+              quantity: 1,
+              costPrice: matched.costPrice || 0,
+            },
+          ];
+        }
+      });
+    }
+  };
+
+  // Add product from manual search
+  const handleAddManualProduct = (p: ProductItem) => {
+    if (mode === "sell") {
+      playBeep(880);
+      setSaleCart((prev) => {
+        const existingIndex = prev.findIndex((item) => item.product.variantId === p.variantId);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex].quantity += 1;
+          showToast(`+1 ${p.name}`);
+          return updated;
+        }
+        showToast(`+1 ${p.name}`);
+        return [...prev, { product: p, quantity: 1 }];
+      });
+    } else {
+      playBeep(1046.5);
+      setReceivingList((prev) => {
+        const existingIndex = prev.findIndex((item) => item.product.variantId === p.variantId);
+        if (existingIndex >= 0) {
+          const updated = [...prev];
+          updated[existingIndex].quantity += 1;
+          showToast(`+1 ${p.name}`);
+          return updated;
+        }
+        showToast(`${p.name} ${t("stockInItemAdded")}`);
+        return [...prev, { product: p, quantity: 1, costPrice: p.costPrice || 0 }];
+      });
+    }
+    setManualQuery("");
+  };
+
+  // Cart quantity adjustments
+  const updateSaleCartQty = (variantId: string, delta: number) => {
+    setSaleCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.product.variantId === variantId) {
+            const nextQty = item.quantity + delta;
+            return nextQty > 0 ? { ...item, quantity: nextQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as SaleCartItem[]
+    );
+  };
+
+  const removeSaleCartItem = (variantId: string) => {
+    setSaleCart((prev) => prev.filter((item) => item.product.variantId !== variantId));
+  };
+
+  // Receiving list adjustments
+  const updateReceivingQty = (variantId: string, nextQty: number) => {
+    if (nextQty <= 0) {
+      setReceivingList((prev) => prev.filter((it) => it.product.variantId !== variantId));
+    } else {
+      setReceivingList((prev) =>
+        prev.map((it) => (it.product.variantId === variantId ? { ...it, quantity: nextQty } : it))
       );
     }
   };
 
-  // Immediate "Scan Next Item" action
-  const handleScanNext = () => {
-    setSelectedProduct(null);
-    setNotFoundCode(null);
-    setSuccessMessage(null);
-    setErrorMessage(null);
-    lastScanCodeRef.current = "";
-    lastScanTimeRef.current = 0;
-    if (activeTab !== "camera") {
-      setActiveTab("camera");
-    }
+  const removeReceivingItem = (variantId: string) => {
+    setReceivingList((prev) => prev.filter((it) => it.product.variantId !== variantId));
   };
+
+  // Calculations for Sales Cart
+  const totalSaleItemsCount = saleCart.reduce((sum, item) => sum + item.quantity, 0);
+  const saleSubtotal = saleCart.reduce((sum, item) => sum + item.quantity * item.product.sellingPrice, 0);
+  const grandTotal = saleSubtotal;
+  const numericTendered = parseFloat(tenderedAmount) || grandTotal;
+  const changeDue = Math.max(0, numericTendered - grandTotal);
+
+  // Calculations for Stock In Staging List
+  const totalReceivingUnits = receivingList.reduce((sum, it) => sum + it.quantity, 0);
 
   // Filtered products for manual search
   const filteredProducts = products.filter((p) => {
@@ -292,72 +453,87 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     );
   });
 
-  // Handle Quick Sell & Deduct with explicit confirmation
-  const handleQuickSell = () => {
-    if (!selectedProduct) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
+  // Handle Checkout (Sales Mode)
+  const handleCheckout = () => {
+    if (saleCart.length === 0) return;
+
+    if (paymentMethod === PaymentMethod.STORE_CREDIT && !selectedCustomerId) {
+      showToast(t("selectCustomer"), "error");
+      return;
+    }
 
     startTransition(async () => {
-      const result = await quickSellItemAction({
-        variantId: selectedProduct.variantId,
-        quantity,
-        paymentMethod,
+      const checkoutData = {
+        idempotencyKey: crypto.randomUUID(),
         customerId: selectedCustomerId || null,
-      });
+        items: saleCart.map((it) => ({
+          variantId: it.product.variantId,
+          quantity: it.quantity,
+          unitPrice: it.product.sellingPrice,
+          discount: 0,
+        })),
+        payments: [
+          {
+            paymentMethod,
+            amount: grandTotal,
+            tenderedAmount: numericTendered,
+            changeGiven: changeDue,
+          },
+        ],
+      };
 
+      const result = await checkoutSaleAction(checkoutData);
       if (!result.success) {
-        setErrorMessage(result.error || "Failed to complete sale");
+        showToast(result.error || t("error"), "error");
       } else {
-        playBeep();
-        const newStock = Math.max(0, selectedProduct.currentStock - quantity);
-        selectedProduct.currentStock = newStock;
-
-        setSuccessMessage(
-          language === "am"
-            ? `${selectedProduct.name} ተሽጧል! ${formatCurrency(result.totalAmount || 0, shop.currency)} ተቀብለዋል፤ ቀሪ ክምችት: ${newStock}`
-            : `${selectedProduct.name} sold! Received ${formatCurrency(result.totalAmount || 0, shop.currency)}; Remaining stock: ${newStock}`
-        );
+        playBeep(1200);
+        // Update local stock balances
+        for (const item of saleCart) {
+          item.product.currentStock = Math.max(0, item.product.currentStock - item.quantity);
+        }
+        setCompletedSale(result.sale);
+        setSaleCart([]);
+        setTenderedAmount("");
+        setSelectedCustomerId("");
+        setIsReviewDrawerOpen(false);
+        showToast(t("saleCompleted"), "success");
       }
     });
   };
 
-  // Handle Explicit Stock Adjustment (+ / -)
-  const handleStockAdjust = () => {
-    if (!selectedProduct) return;
-    setErrorMessage(null);
-    setSuccessMessage(null);
+  // Handle Confirm Stock In (Stock In Mode)
+  const handleConfirmStockIn = () => {
+    if (receivingList.length === 0) return;
 
     startTransition(async () => {
-      const result = await adjustStockAction({
-        variantId: selectedProduct.variantId,
-        adjustmentType: adjustType === "ADD" ? "ADD_QUANTITY" : "DEDUCT_QUANTITY",
-        quantity: stockAdjustQty,
-        reason: stockAdjustReason,
-        notes: `Adjusted via Quick Scanner (${adjustType === "ADD" ? "+" : "-"}${stockAdjustQty})`,
+      const result = await batchStockInAction({
+        items: receivingList.map((it) => ({
+          variantId: it.product.variantId,
+          quantity: it.quantity,
+          costPrice: it.costPrice,
+        })),
+        notes: receivingNotes || undefined,
       });
 
       if (!result.success) {
-        setErrorMessage(result.error || "Failed to adjust stock");
+        showToast(result.error || t("error"), "error");
       } else {
-        playBeep();
-        const newStock =
-          adjustType === "ADD"
-            ? selectedProduct.currentStock + stockAdjustQty
-            : Math.max(0, selectedProduct.currentStock - stockAdjustQty);
-        selectedProduct.currentStock = newStock;
-
-        setSuccessMessage(
-          language === "am"
-            ? `${selectedProduct.name} ክምችት ተስተካክሏል! አሁን ያለው ክምችት: ${newStock}`
-            : `Stock adjusted for ${selectedProduct.name}! New stock: ${newStock}`
-        );
+        playBeep(1200);
+        // Update local stock balances
+        for (const it of receivingList) {
+          it.product.currentStock += it.quantity;
+        }
+        setCompletedStockIn(result.result);
+        setReceivingList([]);
+        setReceivingNotes("");
+        setIsReviewDrawerOpen(false);
+        showToast(t("stockInSuccess"), "success");
       }
     });
   };
 
   const handleSignOut = async () => {
-    if (confirm(language === "am" ? "እርግጠኛ ነዎት መውጣት ይፈልጋሉ?" : "Are you sure you want to sign out?")) {
+    if (confirm(t("areYouSure"))) {
       await logoutAction();
       router.push("/login");
       router.refresh();
@@ -365,13 +541,13 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none pb-12">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans select-none pb-28">
       {/* Top Header */}
-      <header className="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
-        <div className="flex items-center gap-3">
+      <header className="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 px-3.5 py-2.5 flex items-center justify-between sticky top-0 z-30">
+        <div className="flex items-center gap-2.5">
           <Link
             href={`/${shopSlug}/dashboard`}
-            className="h-9 w-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+            className="h-8 w-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
             title="Return to Main Dashboard"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -379,9 +555,9 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
           <div>
             <h1 className="text-sm font-bold text-white flex items-center gap-1.5 leading-none">
               <Smartphone className="h-4 w-4 text-emerald-400" />
-              <span>{language === "am" ? "ፈጣን መቃኛ" : "Quick Scanner"}</span>
+              <span>{t("scannerTitle")}</span>
             </h1>
-            <p className="text-[11px] text-slate-400 truncate max-w-[170px] mt-0.5">{shop.name}</p>
+            <p className="text-[10px] text-slate-400 truncate max-w-[150px] mt-0.5">{shop.name}</p>
           </div>
         </div>
 
@@ -389,7 +565,7 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
           <LanguageSwitcher />
           <button
             onClick={handleSignOut}
-            title="Sign Out"
+            title={t("signOut")}
             className="h-8 w-8 rounded-lg bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-slate-400 hover:text-rose-400 transition-colors"
           >
             <LogOut className="h-3.5 w-3.5" />
@@ -397,55 +573,111 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
         </div>
       </header>
 
-      {/* Mode Tabs */}
-      <div className="bg-slate-900/60 p-2 border-b border-slate-800/80 flex gap-2">
+      {/* DUAL MODE SELECTOR: SELL vs STOCK IN */}
+      <div className="bg-slate-900/80 p-2 border-b border-slate-800 flex gap-2">
         <button
           type="button"
-          onClick={() => setActiveTab("camera")}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-            activeTab === "camera"
-              ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-              : "bg-slate-800/60 text-slate-400 hover:text-slate-200"
+          onClick={() => {
+            setMode("sell");
+            setIsReviewDrawerOpen(false);
+          }}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+            mode === "sell"
+              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950 ring-2 ring-emerald-500/50"
+              : "bg-slate-800/70 text-slate-400 hover:text-slate-200"
           }`}
         >
-          <Camera className="h-4 w-4" />
-          <span>{t("cameraScanTab")}</span>
+          <Zap className="h-4 w-4" />
+          <span>{t("scannerModeSell")}</span>
+          {saleCart.length > 0 && (
+            <span className="bg-emerald-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
+              {totalSaleItemsCount}
+            </span>
+          )}
         </button>
 
         <button
           type="button"
-          onClick={() => setActiveTab("manual")}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-            activeTab === "manual"
-              ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-              : "bg-slate-800/60 text-slate-400 hover:text-slate-200"
+          onClick={() => {
+            setMode("stock_in");
+            setIsReviewDrawerOpen(false);
+          }}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+            mode === "stock_in"
+              ? "bg-blue-600 text-white shadow-lg shadow-blue-950 ring-2 ring-blue-500/50"
+              : "bg-slate-800/70 text-slate-400 hover:text-slate-200"
           }`}
         >
-          <Barcode className="h-4 w-4" />
-          <span>{t("manualLookupTab")}</span>
+          <ArrowDownToLine className="h-4 w-4" />
+          <span>{t("scannerModeStockIn")}</span>
+          {receivingList.length > 0 && (
+            <span className="bg-blue-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
+              {totalReceivingUnits}
+            </span>
+          )}
         </button>
       </div>
 
-      {/* Status Messages */}
-      {successMessage && (
-        <div className="m-3 p-3.5 bg-emerald-950/90 border border-emerald-500/60 rounded-xl flex items-center gap-2.5 text-xs text-emerald-200 animate-in fade-in">
-          <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-          <span className="font-semibold">{successMessage}</span>
-        </div>
-      )}
+      {/* Sub-Tabs: Camera Scan vs Manual Search */}
+      <div className="bg-slate-900/40 px-3 py-1.5 border-b border-slate-800/60 flex items-center justify-between text-xs">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("camera")}
+            className={`py-1 px-3 rounded-lg font-bold flex items-center gap-1.5 transition-colors ${
+              activeTab === "camera"
+                ? "bg-slate-800 text-white border border-slate-700"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            <span>{t("cameraScanTab")}</span>
+          </button>
 
-      {errorMessage && (
-        <div className="m-3 p-3.5 bg-rose-950/90 border border-rose-500/60 rounded-xl flex items-center gap-2.5 text-xs text-rose-200 animate-in fade-in">
-          <AlertCircle className="h-5 w-5 text-rose-400 shrink-0" />
-          <span className="font-medium">{errorMessage}</span>
+          <button
+            type="button"
+            onClick={() => setActiveTab("manual")}
+            className={`py-1 px-3 rounded-lg font-bold flex items-center gap-1.5 transition-colors ${
+              activeTab === "manual"
+                ? "bg-slate-800 text-white border border-slate-700"
+                : "text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Barcode className="h-3.5 w-3.5" />
+            <span>{t("manualLookupTab")}</span>
+          </button>
+        </div>
+
+        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+          USB/Bluetooth Scanner Ready
+        </span>
+      </div>
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div
+          className={`mx-3 my-2 p-3 rounded-xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in shadow-xl ${
+            toastMessage.type === "success"
+              ? "bg-emerald-950/95 border border-emerald-500 text-emerald-200"
+              : toastMessage.type === "error"
+              ? "bg-rose-950/95 border border-rose-500 text-rose-200"
+              : "bg-blue-950/95 border border-blue-500 text-blue-200"
+          }`}
+        >
+          {toastMessage.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+          )}
+          <span>{toastMessage.text}</span>
         </div>
       )}
 
       {/* Main View Area */}
-      <div className="flex-1 p-3 flex flex-col space-y-4">
+      <div className="flex-1 p-3 flex flex-col space-y-3">
         {/* CAMERA VIEWPORT */}
         {activeTab === "camera" && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="relative w-full aspect-4/3 sm:aspect-video bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-2xl flex items-center justify-center">
               {/* html5-qrcode DOM Target */}
               <div id="html5-scanner-box" className="w-full h-full object-cover" />
@@ -453,12 +685,38 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
               {/* Viewfinder Target Reticle Overlay */}
               {isCameraRunning && (
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
-                  <div className="w-56 h-36 border-2 border-dashed border-emerald-400/80 rounded-2xl relative shadow-lg">
-                    <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-emerald-400 rounded-tl" />
-                    <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-emerald-400 rounded-tr" />
-                    <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-emerald-400 rounded-bl" />
-                    <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-emerald-400 rounded-br" />
-                    <div className="w-full h-0.5 bg-emerald-400/80 absolute top-1/2 -translate-y-1/2 animate-pulse shadow-sm shadow-emerald-400" />
+                  <div
+                    className={`w-56 h-36 border-2 border-dashed rounded-2xl relative shadow-lg ${
+                      mode === "sell" ? "border-emerald-400/80" : "border-blue-400/80"
+                    }`}
+                  >
+                    <div
+                      className={`absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 rounded-tl ${
+                        mode === "sell" ? "border-emerald-400" : "border-blue-400"
+                      }`}
+                    />
+                    <div
+                      className={`absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 rounded-tr ${
+                        mode === "sell" ? "border-emerald-400" : "border-blue-400"
+                      }`}
+                    />
+                    <div
+                      className={`absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 rounded-bl ${
+                        mode === "sell" ? "border-emerald-400" : "border-blue-400"
+                      }`}
+                    />
+                    <div
+                      className={`absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 rounded-br ${
+                        mode === "sell" ? "border-emerald-400" : "border-blue-400"
+                      }`}
+                    />
+                    <div
+                      className={`w-full h-0.5 absolute top-1/2 -translate-y-1/2 animate-pulse shadow-sm ${
+                        mode === "sell"
+                          ? "bg-emerald-400/80 shadow-emerald-400"
+                          : "bg-blue-400/80 shadow-blue-400"
+                      }`}
+                    />
                   </div>
                 </div>
               )}
@@ -474,7 +732,7 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
                         ? "bg-amber-400 text-slate-900 ring-2 ring-amber-300"
                         : "bg-black/60 backdrop-blur-md text-white border border-white/20"
                     }`}
-                    title="Toggle Flashlight"
+                    title={t("toggleTorch")}
                   >
                     {isTorchOn ? <Flashlight className="h-4 w-4" /> : <FlashlightOff className="h-4 w-4" />}
                   </button>
@@ -485,61 +743,59 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
                   onClick={isCameraRunning ? stopCamera : startCamera}
                   className="bg-black/70 backdrop-blur-md text-xs font-semibold px-3 py-1.5 rounded-full text-slate-200 border border-white/10 hover:bg-black/90 transition-colors"
                 >
-                  {isCameraRunning
-                    ? language === "am" ? "ካሜራ አቁም" : "Pause Camera"
-                    : language === "am" ? "ካሜራ ጀምር" : "Start Camera"}
+                  {isCameraRunning ? t("pauseCamera") : t("startScanning")}
                 </button>
               </div>
 
-              {/* Bottom Camera Instruction */}
+              {/* Instruction banner */}
               {isCameraRunning && (
                 <div className="absolute bottom-2.5 left-0 right-0 text-center pointer-events-none">
-                  <span className="bg-black/70 backdrop-blur-md px-3.5 py-1 rounded-full text-[11px] text-slate-300 font-medium border border-white/10">
-                    {language === "am" ? "የዕቃውን ባርኮድ ወደ መስመሩ ያቅርቡ" : "Align barcode or QR code within the frame"}
+                  <span
+                    className={`backdrop-blur-md px-3.5 py-1 rounded-full text-[11px] font-semibold border ${
+                      mode === "sell"
+                        ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/40"
+                        : "bg-blue-950/80 text-blue-300 border-blue-500/40"
+                    }`}
+                  >
+                    {mode === "sell" ? t("cameraInstructionSell") : t("cameraInstructionStockIn")}
                   </span>
                 </div>
               )}
 
-              {/* Paused state message */}
+              {/* Paused state overlay */}
               {!isCameraRunning && (
                 <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-3">
                   <div className="h-12 w-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-400">
                     <Camera className="h-6 w-6" />
                   </div>
-                  <h3 className="font-bold text-sm text-white">
-                    {language === "am" ? "ካሜራው ቆሟል" : "Camera is Paused"}
-                  </h3>
+                  <h3 className="font-bold text-sm text-white">{t("cameraPaused")}</h3>
                   <button
                     type="button"
                     onClick={startCamera}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg transition-transform active:scale-95"
                   >
-                    {language === "am" ? "መቃኘት ጀምር" : "Start Scanning"}
+                    {t("startScanning")}
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Camera error instructions */}
+            {/* Camera error fallback */}
             {cameraError && (
-              <div className="p-3.5 bg-rose-950/80 border border-rose-800/80 rounded-xl text-xs space-y-2 text-rose-200">
-                <div className="flex items-center gap-2 font-bold text-rose-300">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{language === "am" ? "የካሜራ ችግር" : "Camera Access Notice"}</span>
-                </div>
+              <div className="p-3 bg-rose-950/80 border border-rose-800 rounded-xl text-xs space-y-2 text-rose-200">
                 <p className="leading-relaxed">{cameraError}</p>
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={startCamera}
-                    className="px-3 py-1.5 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-lg text-xs"
+                    className="px-3 py-1 bg-rose-700 hover:bg-rose-600 text-white font-bold rounded-lg text-xs"
                   >
-                    {language === "am" ? "እንደገና ሞክር" : "Retry Permission"}
+                    {t("cameraRetry")}
                   </button>
                   <button
                     onClick={() => setActiveTab("manual")}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg text-xs"
+                    className="px-3 py-1 bg-slate-800 text-slate-200 font-bold rounded-lg text-xs"
                   >
-                    {language === "am" ? "በእጅ ፈልግ" : "Use Manual Search"}
+                    {t("manualLookupTab")}
                   </button>
                 </div>
               </div>
@@ -547,7 +803,7 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
           </div>
         )}
 
-        {/* MANUAL LOOKUP TAB */}
+        {/* MANUAL SEARCH TAB */}
         {activeTab === "manual" && (
           <div className="space-y-3">
             <div className="relative">
@@ -556,41 +812,46 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
                 type="text"
                 value={manualQuery}
                 onChange={(e) => setManualQuery(e.target.value)}
-                placeholder={language === "am" ? "ባርኮድ፣ SKU ወይም የዕቃ ስም ይተይቡ..." : "Type barcode, SKU, or item name..."}
+                placeholder={t("typeBarcodeOrName")}
                 className="w-full pl-9 pr-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-medium"
                 autoFocus
               />
             </div>
 
             {manualQuery.trim() && (
-              <div className="max-h-72 overflow-y-auto space-y-1.5">
+              <div className="max-h-80 overflow-y-auto space-y-2">
                 {filteredProducts.length === 0 ? (
                   <div className="p-4 text-center text-xs text-slate-400 bg-slate-900/60 rounded-xl border border-slate-800">
-                    {language === "am" ? "ምንም የተገኘ ዕቃ የለም" : "No matching items found"}
+                    {t("emptyCart")}
                   </div>
                 ) : (
                   filteredProducts.map((p) => (
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedProduct(p);
-                        setNotFoundCode(null);
-                        setQuantity(1);
-                        setStockAdjustQty(1);
-                        setStockAdjustReason("Restock / New Shipment");
-                        setManualQuery("");
-                      }}
+                      onClick={() => handleAddManualProduct(p)}
                       className="w-full p-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl flex items-center justify-between text-left transition-colors active:scale-[0.99]"
                     >
                       <div>
                         <div className="text-xs font-bold text-white">{p.name}</div>
                         <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {p.barcode ? `Barcode: ${p.barcode}` : `SKU: ${p.sku}`} • {p.currentStock} {t("inStock")}
+                          {p.barcode ? `Barcode: ${p.barcode}` : `SKU: ${p.sku}`} • {p.currentStock}{" "}
+                          {t("inStock")}
                         </div>
                       </div>
-                      <div className="text-xs font-extrabold text-emerald-400">
-                        {formatCurrency(p.sellingPrice, shop.currency)}
+                      <div className="text-right">
+                        <div
+                          className={`text-xs font-extrabold ${
+                            mode === "sell" ? "text-emerald-400" : "text-blue-400"
+                          }`}
+                        >
+                          {mode === "sell"
+                            ? formatCurrency(p.sellingPrice, shop.currency)
+                            : `${t("costPrice")}: ${formatCurrency(p.costPrice || 0, shop.currency)}`}
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded-full border border-blue-800">
+                          + {mode === "sell" ? t("addToCart") : t("addToReceivingList")}
+                        </span>
                       </div>
                     </button>
                   ))
@@ -600,150 +861,314 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
           </div>
         )}
 
-        {/* NOT FOUND ITEM CARD */}
-        {notFoundCode && !selectedProduct && (
-          <div className="p-4 bg-amber-950/60 border border-amber-600/70 rounded-2xl space-y-3 animate-in slide-in-from-bottom-2 shadow-lg">
+        {/* UNRECOGNIZED BARCODE BANNER */}
+        {notFoundCode && (
+          <div className="p-4 bg-amber-950/70 border border-amber-600 rounded-2xl space-y-2.5 animate-in slide-in-from-bottom-2 shadow-lg">
             <div className="flex items-start gap-2.5">
               <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <h3 className="text-xs font-bold text-amber-200">
-                  {language === "am" ? "ዕቃው በክምችት ውስጥ አልተገኘም" : "Unrecognized Barcode"}
-                </h3>
-                <p className="text-[11px] text-amber-300/80 font-mono mt-0.5">
-                  Code: <span className="font-bold text-white">{notFoundCode}</span>
+                <h3 className="text-xs font-bold text-amber-200">{t("unrecognizedBarcode")}</h3>
+                <p className="text-[11px] text-amber-300 font-mono">
+                  Barcode: <span className="font-bold text-white">{notFoundCode}</span>
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-amber-800/40">
+            <div className="flex gap-2 pt-1 border-t border-amber-800/40">
               <Link
                 href={`/${shopSlug}/products?new=1&barcode=${encodeURIComponent(notFoundCode)}`}
                 className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>{language === "am" ? "አዲስ ዕቃ መዝግብ" : "Register as New Product"}</span>
+                <span>{t("registerNewProduct")}</span>
               </Link>
 
               <button
                 type="button"
-                onClick={handleScanNext}
-                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1"
+                onClick={() => setNotFoundCode(null)}
+                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold"
               >
-                <RefreshCw className="h-3.5 w-3.5" />
-                <span>{language === "am" ? "ቀጣይ ዕቃ ቃኝ" : "Scan Next"}</span>
+                {t("close")}
               </button>
             </div>
           </div>
         )}
 
-        {/* SCANNED / SELECTED PRODUCT CARD */}
-        {selectedProduct && (
-          <div className="bg-slate-900 border-2 border-emerald-500/80 rounded-2xl p-4 space-y-4 shadow-2xl animate-in slide-in-from-bottom-3">
-            {/* Header info */}
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    {t("scannedItem")}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-medium">{selectedProduct.category}</span>
-                </div>
-                <h2 className="text-base font-bold text-white mt-1.5 leading-snug">{selectedProduct.name}</h2>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">
-                  {selectedProduct.barcode ? `Barcode: ${selectedProduct.barcode}` : `SKU: ${selectedProduct.sku}`}
-                </p>
+        {/* READY TO SCAN HINT (When lists are empty) */}
+        {((mode === "sell" && saleCart.length === 0) ||
+          (mode === "stock_in" && receivingList.length === 0)) &&
+          !notFoundCode && (
+            <div className="p-6 bg-slate-900/40 rounded-2xl border border-slate-800/80 text-center space-y-2">
+              <div
+                className={`h-11 w-11 rounded-2xl flex items-center justify-center mx-auto border ${
+                  mode === "sell"
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                }`}
+              >
+                <Barcode className="h-5 w-5" />
               </div>
+              <h3 className="font-bold text-xs text-white">{t("readyToScan")}</h3>
+              <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+                {t("readyToScanDesc")}
+              </p>
+            </div>
+          )}
 
-              <div className="text-right shrink-0">
-                <div className="text-lg font-extrabold text-emerald-400">
-                  {formatCurrency(selectedProduct.sellingPrice, shop.currency)}
-                </div>
-                <span
-                  className={`inline-block mt-0.5 text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                    selectedProduct.currentStock <= 0
-                      ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                      : selectedProduct.currentStock <= 5
-                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                      : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                  }`}
-                >
-                  {selectedProduct.currentStock <= 0
-                    ? t("outOfStock")
-                    : `${selectedProduct.currentStock} ${selectedProduct.unit || "pcs"} ${t("inStock")}`}
+        {/* QUICK LIST PREVIEW (SHOWS LAST SCANNED ITEMS) */}
+        {mode === "sell" && saleCart.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <ShoppingCart className="h-4 w-4 text-emerald-400" />
+                <span>
+                  {t("cart")} ({totalSaleItemsCount})
                 </span>
-              </div>
-            </div>
-
-            {/* Action Mode Toggle Bar */}
-            <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs font-semibold">
+              </span>
               <button
                 type="button"
-                onClick={() => setActionMode("sell")}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
-                  actionMode === "sell"
-                    ? "bg-emerald-600 text-white shadow-xs"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
+                onClick={() => setSaleCart([])}
+                className="text-[11px] text-rose-400 hover:underline"
               >
-                <Zap className="h-3.5 w-3.5" />
-                <span>{language === "am" ? "ሽያጭ" : "Quick Sell"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActionMode("adjust")}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
-                  actionMode === "adjust"
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                <span>{language === "am" ? "ክምችት ማስተካከያ" : "Adjust Stock"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActionMode("info")}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-1 transition-all ${
-                  actionMode === "info"
-                    ? "bg-purple-600 text-white shadow-xs"
-                    : "text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Info className="h-3.5 w-3.5" />
-                <span>{language === "am" ? "ዝርዝር" : "Item Info"}</span>
+                {t("clearCart")}
               </button>
             </div>
 
-            {/* TAB 1: QUICK SELL */}
-            {actionMode === "sell" && (
-              <div className="space-y-3.5 pt-1">
-                {/* Quantity Controls */}
-                <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-xs font-semibold text-slate-300">{t("quantity")}:</span>
-                  <div className="flex items-center gap-3">
+            <div className="space-y-1.5 max-h-52 overflow-y-auto">
+              {saleCart.map((item) => (
+                <div
+                  key={item.product.variantId}
+                  className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl flex items-center justify-between text-xs"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="font-bold text-white truncate">{item.product.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {formatCurrency(item.product.sellingPrice, shop.currency)} x {item.quantity} ={" "}
+                      <span className="font-bold text-emerald-400">
+                        {formatCurrency(item.product.sellingPrice * item.quantity, shop.currency)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                      className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-200 active:bg-slate-700"
+                      onClick={() => updateSaleCartQty(item.product.variantId, -1)}
+                      className="h-7 w-7 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300"
                     >
-                      <Minus className="h-4 w-4" />
+                      <Minus className="h-3.5 w-3.5" />
                     </button>
-                    <span className="text-base font-extrabold text-white min-w-8 text-center">{quantity}</span>
+                    <span className="font-mono font-extrabold text-white min-w-6 text-center text-xs">
+                      {item.quantity}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => setQuantity((q) => q + 1)}
-                      className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-200 active:bg-slate-700"
+                      onClick={() => updateSaleCartQty(item.product.variantId, 1)}
+                      className="h-7 w-7 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeSaleCartItem(item.product.variantId)}
+                      className="h-7 w-7 rounded-lg text-slate-500 hover:text-rose-400 flex items-center justify-center ml-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
 
-                {/* Payment Method Selector */}
+        {/* STOCK IN STAGING PREVIEW */}
+        {mode === "stock_in" && receivingList.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 shadow-lg">
+            <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <Package className="h-4 w-4 text-blue-400" />
+                <span>
+                  {t("receivingList")} ({totalReceivingUnits} {t("unitPcs")})
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setReceivingList([])}
+                className="text-[11px] text-rose-400 hover:underline"
+              >
+                {t("clearCart")}
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-52 overflow-y-auto">
+              {receivingList.map((item) => (
+                <div
+                  key={item.product.variantId}
+                  className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl flex items-center justify-between text-xs"
+                >
+                  <div className="min-w-0 pr-2">
+                    <div className="font-bold text-white truncate">{item.product.name}</div>
+                    <div className="text-[10px] text-slate-400 font-mono">
+                      {t("previousStock")}: {item.product.currentStock} &rarr;{" "}
+                      <span className="font-bold text-blue-400">
+                        {t("newStock")}: {item.product.currentStock + item.quantity}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => updateReceivingQty(item.product.variantId, item.quantity - 1)}
+                      className="h-7 w-7 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={item.quantity}
+                      onChange={(e) =>
+                        updateReceivingQty(item.product.variantId, parseInt(e.target.value) || 1)
+                      }
+                      className="w-10 h-7 text-center font-mono font-extrabold text-xs bg-slate-800 text-white rounded-lg border border-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateReceivingQty(item.product.variantId, item.quantity + 1)}
+                      className="h-7 w-7 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-300"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeReceivingItem(item.product.variantId)}
+                      className="h-7 w-7 rounded-lg text-slate-500 hover:text-rose-400 flex items-center justify-center ml-1"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* STICKY BOTTOM ACTION BAR (SELL or STOCK IN) */}
+      {mode === "sell" && saleCart.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-20">
+          <button
+            type="button"
+            onClick={() => setIsReviewDrawerOpen(true)}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-xl flex items-center justify-between transition-transform cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="bg-emerald-800 text-white text-xs px-2 py-0.5 rounded-full font-mono">
+                {totalSaleItemsCount} {t("itemsInCart")}
+              </span>
+              <span className="text-sm">{t("viewCartAndCheckout")}</span>
+            </div>
+            <span className="font-mono text-base font-extrabold">
+              {formatCurrency(grandTotal, shop.currency)} &rarr;
+            </span>
+          </button>
+        </div>
+      )}
+
+      {mode === "stock_in" && receivingList.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 z-20">
+          <button
+            type="button"
+            onClick={() => setIsReviewDrawerOpen(true)}
+            className="w-full bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white font-extrabold py-3.5 px-4 rounded-xl shadow-xl flex items-center justify-between transition-transform cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <span className="bg-blue-800 text-white text-xs px-2 py-0.5 rounded-full font-mono">
+                {totalReceivingUnits} {t("unitPcs")}
+              </span>
+              <span className="text-sm">{t("confirmStockInBtn")}</span>
+            </div>
+            <span className="font-mono text-sm font-bold">
+              {receivingList.length} {language === "am" ? "ዕቃዎች" : "products"} &rarr;
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* CHECKOUT / CONFIRMATION MODAL DRAWER */}
+      {isReviewDrawerOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 flex flex-col justify-end">
+          <div className="bg-slate-900 border-t border-slate-700 rounded-t-3xl max-h-[90vh] overflow-y-auto p-4 space-y-4 animate-in slide-in-from-bottom">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                {mode === "sell" ? (
+                  <>
+                    <ShoppingCart className="h-5 w-5 text-emerald-400" />
+                    <span>{t("cart")} ({totalSaleItemsCount})</span>
+                  </>
+                ) : (
+                  <>
+                    <Package className="h-5 w-5 text-blue-400" />
+                    <span>{t("receivingList")} ({totalReceivingUnits} {t("unitPcs")})</span>
+                  </>
+                )}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsReviewDrawerOpen(false)}
+                className="h-8 w-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* SALES CHECKOUT CONTENT */}
+            {mode === "sell" && (
+              <div className="space-y-4">
+                {/* Cart summary lines */}
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {saleCart.map((it) => (
+                    <div
+                      key={it.product.variantId}
+                      className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-950/60 border border-slate-800"
+                    >
+                      <div>
+                        <div className="font-bold text-white">{it.product.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {formatCurrency(it.product.sellingPrice, shop.currency)} x {it.quantity}
+                        </div>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-400">
+                        {formatCurrency(it.product.sellingPrice * it.quantity, shop.currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Subtotal & Total */}
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-slate-400">
+                    <span>{t("subtotal")}:</span>
+                    <span className="font-mono font-bold text-white">
+                      {formatCurrency(saleSubtotal, shop.currency)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm font-extrabold text-white pt-1 border-t border-slate-800">
+                    <span>{t("totalToPay")}:</span>
+                    <span className="font-mono text-emerald-400">
+                      {formatCurrency(grandTotal, shop.currency)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Payment Method */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold text-slate-400">{t("paymentMethod")}:</label>
+                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {t("paymentMethod")}
+                  </label>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <button
                       type="button"
@@ -795,230 +1220,204 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
                   </div>
                 </div>
 
-                {/* Optional Customer Selection if credit */}
-                {paymentMethod === PaymentMethod.STORE_CREDIT && (
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-amber-400">
-                      {language === "am" ? "የባለዕዳ ደንበኛ ምረጥ" : "Select Credit Customer"}:
-                    </label>
-                    <select
-                      value={selectedCustomerId}
-                      onChange={(e) => setSelectedCustomerId(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-xs text-white"
-                      required
-                    >
-                      <option value="">-- {t("selectCustomer")} --</option>
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.phone ? `(${c.phone})` : ""} - Credit: {formatCurrency(c.outstandingCredit, shop.currency)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {/* Total and Sell Button */}
-                <div className="pt-2 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-slate-300 font-semibold px-1">
-                    <span>{t("totalToPay")}:</span>
-                    <span className="text-base font-extrabold text-white font-mono">
-                      {formatCurrency(selectedProduct.sellingPrice * quantity, shop.currency)}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleQuickSell}
-                    disabled={isPending}
-                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 transition-all cursor-pointer"
-                  >
-                    <Zap className="h-4 w-4" />
-                    <span>
-                      {isPending
-                        ? t("loading")
-                        : `${t("quickSellAndDeductBtn")} (${formatCurrency(selectedProduct.sellingPrice * quantity, shop.currency)})`}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: EXPLICIT STOCK ADJUSTMENT (+ / -) */}
-            {actionMode === "adjust" && (
-              <div className="space-y-3.5 pt-1">
-                {/* Adjust Type: Add (+) vs Deduct (-) */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-                  <button
-                    type="button"
-                    onClick={() => setAdjustType("ADD")}
-                    className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 transition-all ${
-                      adjustType === "ADD"
-                        ? "bg-blue-600 border-blue-500 text-white shadow-md shadow-blue-950"
-                        : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    <Plus className="h-4 w-4 text-emerald-400" />
-                    <span>{language === "am" ? "ክምችት ጨምር (+)" : "Add Stock (+)"}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setAdjustType("DEDUCT")}
-                    className={`py-2 px-3 rounded-xl border flex items-center justify-center gap-1.5 transition-all ${
-                      adjustType === "DEDUCT"
-                        ? "bg-rose-700 border-rose-600 text-white shadow-md shadow-rose-950"
-                        : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    <Minus className="h-4 w-4 text-rose-300" />
-                    <span>{language === "am" ? "ክምችት ቀንስ (-)" : "Deduct Stock (-)"}</span>
-                  </button>
-                </div>
-
-                {/* Quantity Stepper */}
-                <div className="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
-                  <span className="text-xs font-semibold text-slate-300">
-                    {language === "am" ? "የሚስተካከለው ብዛት" : "Adjustment Quantity"}:
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setStockAdjustQty((q) => Math.max(1, q - 1))}
-                      className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-200 active:bg-slate-700"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </button>
-                    <span className="text-base font-extrabold text-white min-w-8 text-center font-mono">
-                      {stockAdjustQty}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setStockAdjustQty((q) => q + 1)}
-                      className="h-8 w-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-200 active:bg-slate-700"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mandatory Reason Selector */}
+                {/* Optional Customer Selector */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-slate-300">
-                    {language === "am" ? "የማስተካከያ ምክንያት (ግዴታ)" : "Mandatory Reason"}:
+                    {t("selectCustomer")}
                   </label>
                   <select
-                    value={stockAdjustReason}
-                    onChange={(e) => setStockAdjustReason(e.target.value)}
+                    value={selectedCustomerId}
+                    onChange={(e) => setSelectedCustomerId(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3 text-xs text-white"
                   >
-                    <option value="Restock / New Shipment">
-                      {language === "am" ? "አዲስ ጭነት ተቀበልኩ (Restock)" : "Restock / New Shipment"}
-                    </option>
-                    <option value="Damaged / Broken / Expired">
-                      {language === "am" ? "የተበላሸ / የተሰበረ ዕቃ (Damaged)" : "Damaged / Broken / Expired"}
-                    </option>
-                    <option value="Count Correction">
-                      {language === "am" ? "የቁጥር ማስተካከያ (Count Correction)" : "Inventory Count Correction"}
-                    </option>
-                    <option value="Customer Return">
-                      {language === "am" ? "ከደንበኛ የተመለሰ ዕቃ (Customer Return)" : "Customer Return"}
-                    </option>
-                    <option value="Internal Store Use">
-                      {language === "am" ? "ለሱቅ አገልግሎት የዋለ (Internal Use)" : "Internal Store Use"}
-                    </option>
+                    <option value="">{t("walkInCustomer")}</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.phone ? `(${c.phone})` : ""}{" "}
+                        {c.outstandingCredit > 0
+                          ? `• [${t("customerCreditBalance")}: ${formatCurrency(c.outstandingCredit, shop.currency)}]`
+                          : ""}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
-                {/* Explicit Stock Confirmation Button */}
+                {/* Quick Cash Tender Shortcuts */}
+                {paymentMethod === PaymentMethod.CASH && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>{t("amountReceived")}:</span>
+                      {changeDue > 0 && (
+                        <span className="text-emerald-400 font-bold">
+                          {t("changeDue")}: {formatCurrency(changeDue, shop.currency)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setTenderedAmount(String(grandTotal))}
+                        className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-bold rounded-lg"
+                      >
+                        {t("exactAmount")}
+                      </button>
+                      {[100, 200, 500, 1000].map((amt) => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setTenderedAmount(String(amt))}
+                          className="py-1.5 px-2 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-mono font-bold rounded-lg"
+                        >
+                          {amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Commit Sale Button */}
                 <button
                   type="button"
-                  onClick={handleStockAdjust}
-                  disabled={isPending}
-                  className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer ${
-                    adjustType === "ADD"
-                      ? "bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white shadow-blue-950"
-                      : "bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white shadow-rose-950"
-                  }`}
+                  onClick={handleCheckout}
+                  disabled={isPending || saleCart.length === 0}
+                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-950 transition-all cursor-pointer"
                 >
-                  <SlidersHorizontal className="h-4 w-4" />
+                  <Zap className="h-4 w-4" />
                   <span>
                     {isPending
                       ? t("loading")
-                      : language === "am"
-                      ? `ክምችት ማስተካከያውን አረጋግጥ (${adjustType === "ADD" ? "+" : "-"}${stockAdjustQty})`
-                      : `Confirm Stock ${adjustType === "ADD" ? "Addition (+)" : "Deduction (-)"} (${stockAdjustQty})`}
+                      : `${t("completeSaleBtn")} (${formatCurrency(grandTotal, shop.currency)})`}
                   </span>
                 </button>
               </div>
             )}
 
-            {/* TAB 3: STOCK INFO */}
-            {actionMode === "info" && (
-              <div className="space-y-2.5 pt-1 text-xs">
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-                  <div className="flex justify-between text-slate-400">
-                    <span>{language === "am" ? "ምድብ" : "Category"}:</span>
-                    <span className="font-semibold text-white">{selectedProduct.category}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>{language === "am" ? "የመለኪያ አሃድ" : "Unit"}:</span>
-                    <span className="font-semibold text-white">{selectedProduct.unit || "pcs"}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>{language === "am" ? "ያለ ክምችት" : "Current Stock"}:</span>
-                    <span className="font-extrabold text-emerald-400 font-mono">
-                      {selectedProduct.currentStock} {selectedProduct.unit || "pcs"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-slate-400">
-                    <span>{language === "am" ? "የመሸጫ ዋጋ" : "Selling Price"}:</span>
-                    <span className="font-extrabold text-white font-mono">
-                      {formatCurrency(selectedProduct.sellingPrice, shop.currency)}
-                    </span>
-                  </div>
+            {/* STOCK IN RECEIVING CONTENT */}
+            {mode === "stock_in" && (
+              <div className="space-y-4">
+                <div className="space-y-2 max-h-52 overflow-y-auto">
+                  {receivingList.map((it) => (
+                    <div
+                      key={it.product.variantId}
+                      className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-xs flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-bold text-white">{it.product.name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {t("previousStock")}: {it.product.currentStock} &rarr;{" "}
+                          <span className="font-bold text-blue-400">
+                            {t("newStock")}: {it.product.currentStock + it.quantity}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="font-mono font-extrabold text-white bg-blue-950 px-2 py-1 rounded-lg border border-blue-800">
+                        +{it.quantity} {t("unitPcs")}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
-                <Link
-                  href={`/${shopSlug}/inventory`}
-                  className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-300">
+                    {t("receivingNotes")}
+                  </label>
+                  <input
+                    type="text"
+                    value={receivingNotes}
+                    onChange={(e) => setReceivingNotes(e.target.value)}
+                    placeholder="e.g. Shipment from Addis Wholesale"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-xs text-white"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmStockIn}
+                  disabled={isPending || receivingList.length === 0}
+                  className="w-full py-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] text-white rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-xl shadow-blue-950 transition-all cursor-pointer"
                 >
-                  <span>{language === "am" ? "ሙሉ የክምችት ዝርዝር ክፈት" : "Open in Desktop Inventory"}</span>
-                  <ExternalLink className="h-3.5 w-3.5" />
-                </Link>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>
+                    {isPending
+                      ? t("loading")
+                      : `${t("confirmStockInBtn")} (+${totalReceivingUnits} ${t("unitPcs")})`}
+                  </span>
+                </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
 
-            {/* Scan Next Item Primary Button */}
-            <div className="pt-2 border-t border-slate-800/80">
+      {/* COMPLETED SALE RECEIPT MODAL */}
+      {completedSale && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 animate-in zoom-in-95 shadow-2xl text-center">
+            <div className="h-12 w-12 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white">{t("saleCompleted")}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-mono">
+                Receipt #{completedSale.receiptNumber}
+              </p>
+              <div className="text-xl font-black text-emerald-400 font-mono mt-2">
+                {formatCurrency(Number(completedSale.totalAmount), shop.currency)}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
               <button
                 type="button"
-                onClick={handleScanNext}
-                className="w-full py-2.5 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-800 text-slate-200 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                onClick={() => window.print()}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
               >
-                <RefreshCw className="h-3.5 w-3.5 text-emerald-400" />
-                <span>{language === "am" ? "ቀጣይ ዕቃ ለመቃኘት እዚህ ይጫኑ" : "Scan Next Item Immediately"}</span>
+                <Printer className="h-3.5 w-3.5" />
+                <span>{t("printReceipt")}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCompletedSale(null)}
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <span>{t("newSale")}</span>
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Ready to scan placeholder when no item is selected */}
-        {!selectedProduct && !notFoundCode && (
-          <div className="p-6 bg-slate-900/60 rounded-2xl border border-slate-800/80 text-center space-y-3">
-            <div className="h-12 w-12 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center justify-center mx-auto">
-              <Barcode className="h-6 w-6" />
+      {/* COMPLETED STOCK IN SUMMARY MODAL */}
+      {completedStockIn && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 animate-in zoom-in-95 shadow-2xl text-center">
+            <div className="h-12 w-12 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="h-6 w-6" />
             </div>
-            <h3 className="font-bold text-sm text-white">
-              {language === "am" ? "ዕቃ ለመቃኘት ተዘጋጅቷል" : "Ready to Scan"}
-            </h3>
-            <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-              {language === "am"
-                ? "የስልክዎን ካሜራ በዕቃው ባርኮድ ላይ ያሳዩ፣ ወይም 'በእጅ ፈልግ' የሚለውን ነክተው በስም ይፈልጉ።"
-                : "Point your phone camera at an item's barcode, or tap 'Manual Code / Name' to search and sell."}
-            </p>
+
+            <div>
+              <h3 className="text-base font-bold text-white">{t("stockInSuccess")}</h3>
+              <p className="text-xs text-slate-400 mt-1 font-mono">
+                Batch #{completedStockIn.batchId.slice(0, 8)}
+              </p>
+              <div className="text-lg font-black text-blue-400 font-mono mt-2">
+                +{completedStockIn.totalUnits} {t("unitPcs")} ({completedStockIn.itemsCount}{" "}
+                {language === "am" ? "ዕቃዎች" : "items"})
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setCompletedStockIn(null)}
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold"
+            >
+              {t("close")}
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

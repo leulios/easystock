@@ -4,6 +4,7 @@ import React from "react";
 import { formatCurrency } from "@/lib/decimal";
 import { Button } from "@/components/ui/button";
 import { Printer, CheckCircle2, X } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface ReceiptModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface ReceiptModalProps {
 }
 
 export function ReceiptModal({ isOpen, onClose, sale, shopName, currency }: ReceiptModalProps) {
+  const { t, language } = useLanguage();
   if (!isOpen || !sale) return null;
 
   const handlePrint = () => {
@@ -25,7 +27,7 @@ export function ReceiptModal({ isOpen, onClose, sale, shopName, currency }: Rece
       <div className="bg-white border border-slate-200 rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
         <div className="p-4 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
           <div className="flex items-center gap-2 text-emerald-800 font-semibold text-sm">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Sale Completed
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" /> {t("saleCompleted")}
           </div>
           <button
             onClick={onClose}
@@ -39,10 +41,12 @@ export function ReceiptModal({ isOpen, onClose, sale, shopName, currency }: Rece
         <div className="p-6 font-mono text-xs overflow-y-auto space-y-4 print:p-0">
           <div className="text-center border-b border-dashed border-slate-300 pb-3">
             <h2 className="font-bold text-sm tracking-tight">{shopName}</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">Official Sale Receipt</p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {language === "am" ? "የሽያጭ ደረሰኝ" : "Official Sale Receipt"}
+            </p>
             <p className="text-[10px] text-slate-400 mt-1">Receipt #: {sale.receiptNumber}</p>
             <p className="text-[10px] text-slate-400">
-              Date: {new Date(sale.createdAt).toLocaleString()}
+              {t("date")}: {new Date(sale.createdAt).toLocaleString()}
             </p>
           </div>
 
@@ -68,21 +72,21 @@ export function ReceiptModal({ isOpen, onClose, sale, shopName, currency }: Rece
           {/* Totals */}
           <div className="space-y-1.5 border-b border-dashed border-slate-300 pb-3 text-xs">
             <div className="flex justify-between text-slate-600">
-              <span>Subtotal:</span>
+              <span>{t("subtotal")}:</span>
               <span>{formatCurrency(sale.subtotal, currency)}</span>
             </div>
             {Number(sale.discountAmount) > 0 && (
               <div className="flex justify-between text-rose-600">
-                <span>Discount:</span>
+                <span>{t("discount")}:</span>
                 <span>-{formatCurrency(sale.discountAmount, currency)}</span>
               </div>
             )}
             <div className="flex justify-between text-slate-600">
-              <span>Tax / VAT:</span>
+              <span>{t("tax")}:</span>
               <span>{formatCurrency(sale.taxAmount, currency)}</span>
             </div>
             <div className="flex justify-between text-sm font-bold text-slate-900 pt-1 border-t border-slate-200">
-              <span>TOTAL PAID:</span>
+              <span>{t("totalToPay")}:</span>
               <span>{formatCurrency(sale.totalAmount, currency)}</span>
             </div>
           </div>
@@ -91,23 +95,23 @@ export function ReceiptModal({ isOpen, onClose, sale, shopName, currency }: Rece
           <div className="text-[11px] text-slate-600">
             {sale.payments?.map((p: any) => (
               <div key={p.id} className="flex justify-between">
-                <span>Method: {p.paymentMethod}</span>
+                <span>{t("paymentMethod")}: {p.paymentMethod}</span>
                 <span>{formatCurrency(p.amount, currency)}</span>
               </div>
             ))}
           </div>
 
           <div className="text-center text-[10px] text-slate-400 pt-2">
-            Thank you for shopping with us!
+            {language === "am" ? "ስለጎበኙን እናመሰግናለን!" : "Thank you for shopping with us!"}
           </div>
         </div>
 
         <div className="p-4 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50">
           <Button variant="outline" size="sm" onClick={onClose} className="w-1/2">
-            Close
+            {t("close")}
           </Button>
           <Button size="sm" onClick={handlePrint} className="w-1/2">
-            <Printer className="h-3.5 w-3.5 mr-1.5" /> Print Receipt
+            <Printer className="h-3.5 w-3.5 mr-1.5" /> {t("printReceipt")}
           </Button>
         </div>
       </div>

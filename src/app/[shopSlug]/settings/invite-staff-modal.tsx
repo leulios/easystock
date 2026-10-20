@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { addStaffAction } from "@/app/actions/staff";
 import { ShopRole } from "@prisma/client";
 import { X, UserPlus, Save, AlertCircle, KeyRound, Shield } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface InviteStaffModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface InviteStaffModalProps {
 }
 
 export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModalProps) {
+  const { t, language } = useLanguage();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<ShopRole>(ShopRole.SHOPKEEPER);
@@ -31,12 +33,12 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
     setError(null);
 
     if (!email.trim() || !fullName.trim()) {
-      setError("Email and Full Name are required.");
+      setError(language === "am" ? "ኢሜይል እና ሙሉ ስም ማስገባት ግዴታ ነው" : "Email and Full Name are required.");
       return;
     }
 
     if (pin && !/^\d{4,6}$/.test(pin)) {
-      setError("POS PIN must be 4 to 6 numeric digits.");
+      setError(language === "am" ? "የገንዘብ መቀበያ ፒን ከ 4 እስከ 6 አሃዝ መሆን አለበት" : "POS PIN must be 4 to 6 numeric digits.");
       return;
     }
 
@@ -52,7 +54,7 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
       });
 
       if (!result.success) {
-        setError(result.error || "Failed to add staff member.");
+        setError(result.error || (language === "am" ? "ሰራተኛውን መመዝገብ አልተቻለም" : "Failed to add staff member."));
       } else {
         onSuccess();
         onClose();
@@ -69,9 +71,9 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
               <UserPlus className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Add Staff Member</h2>
+              <h2 className="text-base font-bold text-slate-900">{t("inviteStaffModalTitle")}</h2>
               <p className="text-xs text-slate-500">
-                Grant role permissions and configure cashier POS switch PIN
+                {t("inviteStaffModalDesc")}
               </p>
             </div>
           </div>
@@ -92,7 +94,7 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Full Name *</label>
+            <label className="text-xs font-semibold text-slate-700">{t("fullNameLabel")} *</label>
             <input
               type="text"
               required
@@ -104,7 +106,7 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Email Address *</label>
+            <label className="text-xs font-semibold text-slate-700">{t("emailLabel")} *</label>
             <input
               type="email"
               required
@@ -117,20 +119,20 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Operational Role *</label>
+              <label className="text-xs font-semibold text-slate-700">{t("staffRole")} *</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as ShopRole)}
                 className="w-full h-10 px-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium"
               >
-                <option value={ShopRole.SHOPKEEPER}>Shopkeeper (Cashier)</option>
-                <option value={ShopRole.SHOP_MANAGER}>Shop Manager</option>
-                <option value={ShopRole.SHOP_OWNER}>Co-Owner</option>
+                <option value={ShopRole.SHOPKEEPER}>{t("roleShopkeeper")}</option>
+                <option value={ShopRole.SHOP_MANAGER}>{t("roleManager")}</option>
+                <option value={ShopRole.SHOP_OWNER}>{t("roleOwner")}</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Quick POS PIN (4-6 digits)</label>
+              <label className="text-xs font-semibold text-slate-700">{t("posPinLabel")}</label>
               <input
                 type="password"
                 maxLength={6}
@@ -145,7 +147,7 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
           {/* Granular Permission Toggles */}
           <div className="space-y-2 pt-2 border-t border-slate-100">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-              Granular Operational Privileges
+              {language === "am" ? "ዝርዝር የስራ ፈቃዶች" : "Granular Operational Privileges"}
             </span>
 
             <label className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
@@ -157,7 +159,7 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
                 className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
               />
               <span className="text-xs text-slate-700 font-medium">
-                Can view P&L financial reports and margins
+                {t("canViewReportsLabel")}
               </span>
             </label>
 
@@ -170,7 +172,7 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
                 className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
               />
               <span className="text-xs text-slate-700 font-medium">
-                Can apply cashier price discounts at POS checkout
+                {t("canApplyDiscountLabel")}
               </span>
             </label>
 
@@ -183,18 +185,18 @@ export function InviteStaffModal({ isOpen, onClose, onSuccess }: InviteStaffModa
                 className="rounded text-blue-600 focus:ring-blue-500 h-4 w-4"
               />
               <span className="text-xs text-slate-700 font-medium">
-                Can execute manual inventory adjustments & write-offs
+                {t("canAdjustStockLabel")}
               </span>
             </label>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={isPending} className="flex items-center gap-1.5">
               <Save className="h-4 w-4" />
-              {isPending ? "Adding Staff..." : "Add Staff Member"}
+              {isPending ? t("loading") : t("sendInviteBtn")}
             </Button>
           </div>
         </form>

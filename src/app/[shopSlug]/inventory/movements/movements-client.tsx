@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatCurrency } from "@/lib/decimal";
 import { ArrowLeft, History, Filter, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { MovementType } from "@prisma/client";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface MovementRow {
   id: string;
@@ -28,12 +29,27 @@ interface MovementsClientProps {
 }
 
 export function MovementsClient({ initialMovements, shopSlug, currency }: MovementsClientProps) {
+  const { t, language } = useLanguage();
   const [movements] = useState<MovementRow[]>(initialMovements);
   const [typeFilter, setTypeFilter] = useState<string>("");
 
   const filtered = movements.filter((m) => {
     return !typeFilter || m.movementType === typeFilter;
   });
+
+  const getMovementLabel = (type: MovementType) => {
+    if (language !== "am") return type.replace("_", " ");
+    switch (type) {
+      case MovementType.SALE_DEDUCTION: return "የሽያጭ ቅነሳ (Sale)";
+      case MovementType.PURCHASE_RECEIPT: return "የግዢ ርክክብ (Purchase)";
+      case MovementType.MANUAL_ADJUSTMENT: return "የእጅ ማስተካከያ (Adjustment)";
+      case MovementType.RETURN_RESTOCK: return "የተመለሰ ዕቃ (Return)";
+      case MovementType.DAMAGE_WASTE: return "ብልሽት / ኪሳራ (Damage)";
+      case MovementType.TRANSFER_IN: return "የገባ ዝውውር (Transfer In)";
+      case MovementType.TRANSFER_OUT: return "የወጣ ዝውውር (Transfer Out)";
+      default: return type;
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -44,13 +60,13 @@ export function MovementsClient({ initialMovements, shopSlug, currency }: Moveme
             href={`/${shopSlug}/inventory`}
             className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium mb-1.5"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Inventory
+            <ArrowLeft className="h-3.5 w-3.5" /> {t("backToInventory")}
           </Link>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Stock Movement Ledger
+            {t("stockLedgerTitle")}
           </h1>
           <p className="text-sm text-slate-500">
-            Immutable, traceable history of all inventory balance changes
+            {t("stockLedgerSubtitle")}
           </p>
         </div>
 
@@ -60,12 +76,12 @@ export function MovementsClient({ initialMovements, shopSlug, currency }: Moveme
             onChange={(e) => setTypeFilter(e.target.value)}
             className="w-full h-10 px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
           >
-            <option value="">All Movement Types</option>
-            <option value="SALE_DEDUCTION">Sale Deductions</option>
-            <option value="PURCHASE_RECEIPT">Purchase Receipts</option>
-            <option value="MANUAL_ADJUSTMENT">Manual Adjustments</option>
-            <option value="RETURN_RESTOCK">Return Restocks</option>
-            <option value="DAMAGE_WASTE">Damage & Shrinkage</option>
+            <option value="">{t("allMovementTypes")}</option>
+            <option value="SALE_DEDUCTION">{language === "am" ? "የሽያጭ ቅነሳ" : "Sale Deductions"}</option>
+            <option value="PURCHASE_RECEIPT">{language === "am" ? "የግዢ ርክክብ" : "Purchase Receipts"}</option>
+            <option value="MANUAL_ADJUSTMENT">{language === "am" ? "የእጅ ማስተካከያ" : "Manual Adjustments"}</option>
+            <option value="RETURN_RESTOCK">{language === "am" ? "የተመለሰ ዕቃ" : "Return Restocks"}</option>
+            <option value="DAMAGE_WASTE">{language === "am" ? "ብልሽት / ኪሳራ" : "Damage & Shrinkage"}</option>
           </select>
         </div>
       </div>
@@ -76,12 +92,12 @@ export function MovementsClient({ initialMovements, shopSlug, currency }: Moveme
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">Product / SKU</th>
-                <th className="py-3 px-4">Event Type</th>
-                <th className="py-3 px-4 text-right">Quantity Delta</th>
-                <th className="py-3 px-4 text-right">Resulting Balance</th>
-                <th className="py-3 px-4">Reference & Reason</th>
+                <th className="py-3 px-4">{t("date")}</th>
+                <th className="py-3 px-4">{t("productName")} / {t("sku")}</th>
+                <th className="py-3 px-4">{t("movementType")}</th>
+                <th className="py-3 px-4 text-right">{t("delta")}</th>
+                <th className="py-3 px-4 text-right">{t("resultingBalance")}</th>
+                <th className="py-3 px-4">{language === "am" ? "ማጣቀሻና ምክንያት" : "Reference & Reason"}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -89,7 +105,7 @@ export function MovementsClient({ initialMovements, shopSlug, currency }: Moveme
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-slate-500">
                     <History className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                    <p className="font-medium text-slate-700">No stock movements recorded</p>
+                    <p className="font-medium text-slate-700">{language === "am" ? "ምንም የእንቅስቃሴ መዝገብ አልተገኘም" : "No stock movements recorded"}</p>
                   </td>
                 </tr>
               ) : (
@@ -123,7 +139,7 @@ export function MovementsClient({ initialMovements, shopSlug, currency }: Moveme
                           ) : (
                             <ArrowUpRight className="h-3 w-3" />
                           )}
-                          {m.movementType.replace("_", " ")}
+                          {getMovementLabel(m.movementType)}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right font-mono font-bold">

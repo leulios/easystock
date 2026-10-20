@@ -18,6 +18,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface InventoryRow {
   productId: string;
@@ -56,6 +57,7 @@ export function InventoryClient({
   siblingShops,
 }: InventoryClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [items, setItems] = useState<InventoryRow[]>(initialItems);
   const [search, setSearch] = useState("");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
@@ -89,9 +91,9 @@ export function InventoryClient({
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Inventory Control</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("inventoryTitle")}</h1>
           <p className="text-sm text-slate-500">
-            Real-time shop stock levels and transactional audit ledger
+            {t("inventorySubtitle")}
           </p>
         </div>
 
@@ -106,7 +108,7 @@ export function InventoryClient({
               }}
               className="flex items-center gap-1.5 text-xs font-semibold bg-white shadow-sm"
             >
-              <ArrowRightLeft className="h-3.5 w-3.5 text-blue-600" /> Transfer Stock
+              <ArrowRightLeft className="h-3.5 w-3.5 text-blue-600" /> {t("transferStockBtn")}
             </Button>
           )}
 
@@ -115,7 +117,7 @@ export function InventoryClient({
             className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
           >
             <History className="h-3.5 w-3.5 text-blue-600" />
-            Movement Ledger <ArrowRight className="h-3.5 w-3.5" />
+            {t("navStockHistory")} <ArrowRight className="h-3.5 w-3.5" />
           </Link>
         </div>
       </div>
@@ -125,7 +127,7 @@ export function InventoryClient({
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Units in Stock
+              {language === "am" ? "ጠቅላላ ፍሬ ክምችት" : "Total Units in Stock"}
             </p>
             <p className="text-2xl font-bold text-slate-900 mt-1">{totalUnits}</p>
           </div>
@@ -137,7 +139,7 @@ export function InventoryClient({
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Total Asset Valuation (Cost)
+              {t("totalStockValuation")}
             </p>
             <p className="text-2xl font-bold text-slate-900 mt-1">
               {formatCurrency(totalValuation, currency)}
@@ -151,7 +153,7 @@ export function InventoryClient({
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Low Stock Warnings
+              {t("lowStockItems")}
             </p>
             <p className="text-2xl font-bold text-amber-600 mt-1">{lowStockCount}</p>
           </div>
@@ -169,7 +171,7 @@ export function InventoryClient({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search stock by SKU, product name, or barcode..."
+            placeholder={t("searchItemPlaceholder")}
             className="w-full h-10 pl-9 pr-4 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
           />
         </div>
@@ -183,7 +185,9 @@ export function InventoryClient({
           }`}
         >
           <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-          {onlyLowStock ? "Showing: Low Stock Only" : "Filter Low Stock"}
+          {onlyLowStock
+            ? language === "am" ? "የሚያልቁ ብቻ በማሳየት ላይ" : "Showing: Low Stock Only"
+            : t("lowStockItems")}
         </button>
       </div>
 

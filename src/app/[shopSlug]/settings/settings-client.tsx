@@ -8,6 +8,7 @@ import { InviteStaffModal } from "./invite-staff-modal";
 import { EditStaffModal } from "./edit-staff-modal";
 import { useRouter } from "next/navigation";
 import { ShopRole } from "@prisma/client";
+import { useLanguage } from "@/lib/i18n/context";
 import {
   Settings,
   Building2,
@@ -73,6 +74,7 @@ export function SettingsClient({
   currentUserRole,
 }: SettingsClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [activeTab, setActiveTab] = useState<"general" | "financial" | "receipt" | "staff">("general");
 
   // Shop settings form state
@@ -104,7 +106,7 @@ export function SettingsClient({
 
     const numericTax = parseFloat(taxRate);
     if (isNaN(numericTax) || numericTax < 0) {
-      setErrorMessage("Tax rate must be a valid positive number");
+      setErrorMessage(language === "am" ? "የታክስ ምጣኔው ትክክለኛ ቁጥር መሆን አለበት" : "Tax rate must be a valid positive number");
       return;
     }
 
@@ -123,7 +125,7 @@ export function SettingsClient({
       });
 
       if (!res.success) {
-        setErrorMessage(res.error || "Failed to update shop settings");
+        setErrorMessage(res.error || (language === "am" ? "ማስተካከያዎችን ማስቀመጥ አልተቻለም" : "Failed to update shop settings"));
       } else {
         setSaveSuccess(true);
         setTimeout(() => setSaveSuccess(false), 3000);
@@ -133,12 +135,15 @@ export function SettingsClient({
   };
 
   const handleRemoveStaff = async (staffId: string, fullName: string) => {
-    if (!confirm(`Are you sure you want to remove ${fullName} from this shop's staff?`)) return;
+    const confirmPrompt = language === "am"
+      ? `እርግጠኛ ነዎት ${fullName} ከዚህ ሱቅ ሰራተኞች እንዲወገዱ ይፈልጋሉ?`
+      : `Are you sure you want to remove ${fullName} from this shop's staff?`;
+    if (!confirm(confirmPrompt)) return;
     const res = await removeStaffAction(staffId);
     if (res.success) {
       router.refresh();
     } else {
-      alert(res.error || "Failed to remove staff member");
+      alert(res.error || (language === "am" ? "ሰራተኛውን ማስወገድ አልተቻለም" : "Failed to remove staff member"));
     }
   };
 
@@ -148,18 +153,18 @@ export function SettingsClient({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Shop Settings</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("settingsTitle")}</h1>
             <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
               {initialShop.code}
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Configure currency, tax policies, thermal receipts, and team permissions
+            {language === "am" ? "የሱቁን መረጃ፣ የታክስ ምጣኔ፣ የደረሰኝ ጽሁፍ እና የሰራተኞችን ፈቃድ ያስተዳድሩ" : "Configure currency, tax policies, thermal receipts, and team permissions"}
           </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500">Subscription Tier:</span>
+          <span className="text-slate-500">{language === "am" ? "የደንበኝነት ደረጃ፦" : "Subscription Tier:"}</span>
           <span className="font-bold capitalize bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-200">
             {initialShop.organization.plan}
           </span>
@@ -167,49 +172,49 @@ export function SettingsClient({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-200 gap-2">
+      <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab("general")}
-          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === "general"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Building2 className="h-4 w-4" /> General Info
+          <Building2 className="h-4 w-4" /> {t("tabGeneral")}
         </button>
 
         <button
           onClick={() => setActiveTab("financial")}
-          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === "financial"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Settings className="h-4 w-4" /> Financial & Policies
+          <Settings className="h-4 w-4" /> {t("tabFinancial")}
         </button>
 
         <button
           onClick={() => setActiveTab("receipt")}
-          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === "receipt"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Receipt className="h-4 w-4" /> Thermal Receipts
+          <Receipt className="h-4 w-4" /> {t("tabReceipt")}
         </button>
 
         <button
           onClick={() => setActiveTab("staff")}
-          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
             activeTab === "staff"
               ? "border-blue-600 text-blue-600"
               : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          <Users className="h-4 w-4" /> Staff & Roles ({initialStaff.length})
+          <Users className="h-4 w-4" /> {t("tabStaff")} ({initialStaff.length})
         </button>
       </div>
 
@@ -224,18 +229,18 @@ export function SettingsClient({
       {saveSuccess && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-xs text-emerald-700">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
-          <span>Shop settings updated successfully!</span>
+          <span>{t("settingsSavedSuccess")}</span>
         </div>
       )}
 
       {/* TAB 1: General Info */}
       {activeTab === "general" && (
         <form onSubmit={handleSaveSettings} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-          <h2 className="text-base font-bold text-slate-900">General Shop Profile</h2>
+          <h2 className="text-base font-bold text-slate-900">{t("shopDetails")}</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Shop Outlet Name *</label>
+              <label className="text-xs font-semibold text-slate-700">{t("shopNameLabel")} *</label>
               <input
                 type="text"
                 required
@@ -247,7 +252,7 @@ export function SettingsClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Outlet Code</label>
+              <label className="text-xs font-semibold text-slate-700">{t("shopCodeLabel")}</label>
               <input
                 type="text"
                 disabled
@@ -257,19 +262,19 @@ export function SettingsClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Contact Phone</label>
+              <label className="text-xs font-semibold text-slate-700">{t("shopPhoneLabel")}</label>
               <input
                 type="tel"
                 disabled={!isOwner}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+1 555-0100"
+                placeholder="+251 91 123 4567"
                 className="w-full h-10 px-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Contact Email</label>
+              <label className="text-xs font-semibold text-slate-700">{t("shopEmailLabel")}</label>
               <input
                 type="email"
                 disabled={!isOwner}
@@ -282,13 +287,13 @@ export function SettingsClient({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Physical Address</label>
+            <label className="text-xs font-semibold text-slate-700">{t("shopAddressLabel")}</label>
             <textarea
               rows={2}
               disabled={!isOwner}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Suite, Street, City, State/Province, Country"
+              placeholder={language === "am" ? "የሱቁ አድራሻ፣ ሰፈር፣ ህንጻ፣ ፎቅ..." : "Suite, Street, City, State/Province, Country"}
               className="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 resize-none"
             />
           </div>
@@ -297,7 +302,7 @@ export function SettingsClient({
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <Button type="submit" disabled={isPending} className="flex items-center gap-1.5">
                 <Save className="h-4 w-4" />
-                {isPending ? "Saving..." : "Save Changes"}
+                {isPending ? t("loading") : t("saveSettingsBtn")}
               </Button>
             </div>
           )}
@@ -308,37 +313,32 @@ export function SettingsClient({
       {activeTab === "financial" && (
         <form onSubmit={handleSaveSettings} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
           <div className="space-y-1">
-            <h2 className="text-base font-bold text-slate-900">Financial & Tax Policies</h2>
+            <h2 className="text-base font-bold text-slate-900">{t("tabFinancial")}</h2>
             <p className="text-xs text-slate-500">
-              Specify pricing currency, tax calculation rates, and out-of-stock sale policies
+              {language === "am" ? "መገበያያ ገንዘብ፣ የታክስ ምጣኔ እና ያለ ክምችት መሸጥ ህግጋትን ያቀናብሩ" : "Specify pricing currency, tax calculation rates, and out-of-stock sale policies"}
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Currency Code *</label>
+              <label className="text-xs font-semibold text-slate-700">{t("currencyLabel")} *</label>
               <select
                 value={currency}
                 disabled={!isOwner}
                 onChange={(e) => setCurrency(e.target.value)}
                 className="w-full h-10 px-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-bold font-mono"
               >
+                <option value="ETB">ETB (Br - Ethiopian Birr)</option>
                 <option value="USD">USD ($ - US Dollar)</option>
                 <option value="EUR">EUR (€ - Euro)</option>
                 <option value="GBP">GBP (£ - British Pound)</option>
-                <option value="CAD">CAD ($ - Canadian Dollar)</option>
-                <option value="AUD">AUD ($ - Australian Dollar)</option>
                 <option value="KES">KES (KSh - Kenyan Shilling)</option>
-                <option value="ETB">ETB (Br - Ethiopian Birr)</option>
-                <option value="NGN">NGN (₦ - Nigerian Naira)</option>
-                <option value="ZAR">ZAR (R - South African Rand)</option>
-                <option value="INR">INR (₹ - Indian Rupee)</option>
                 <option value="AED">AED (AED - UAE Dirham)</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Sales Tax Rate (%) *</label>
+              <label className="text-xs font-semibold text-slate-700">{t("taxRateLabel")} *</label>
               <input
                 type="number"
                 step="0.01"
@@ -353,7 +353,7 @@ export function SettingsClient({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-700">Tax ID / VAT Number</label>
+              <label className="text-xs font-semibold text-slate-700">{language === "am" ? "የታክስ / የቫት መለያ ቁጥር (TIN)" : "Tax ID / VAT Number"}</label>
               <input
                 type="text"
                 disabled={!isOwner}
@@ -370,11 +370,10 @@ export function SettingsClient({
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-slate-900 block">
-                  Allow Negative Stock (Backorders)
+                  {t("negativeStockTitle")}
                 </span>
                 <p className="text-xs text-slate-500 max-w-lg mt-0.5">
-                  When enabled, cashiers can complete sales even if the recorded inventory balance is 0.
-                  When disabled (recommended), sales will be rejected atomically if insufficient stock is available.
+                  {t("negativeStockDescription")}
                 </p>
               </div>
 
@@ -395,7 +394,7 @@ export function SettingsClient({
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <Button type="submit" disabled={isPending} className="flex items-center gap-1.5">
                 <Save className="h-4 w-4" />
-                {isPending ? "Saving..." : "Save Policies"}
+                {isPending ? t("loading") : t("saveSettingsBtn")}
               </Button>
             </div>
           )}
@@ -406,32 +405,32 @@ export function SettingsClient({
       {activeTab === "receipt" && (
         <form onSubmit={handleSaveSettings} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <div className="space-y-1">
-            <h2 className="text-base font-bold text-slate-900">Thermal Receipt Layout</h2>
+            <h2 className="text-base font-bold text-slate-900">{t("tabReceipt")}</h2>
             <p className="text-xs text-slate-500">
-              Customize the header and footer messages printed on customer receipts (80mm / 58mm thermal rolls)
+              {language === "am" ? "በደንበኞች ደረሰኝ ላይ የሚታተሙትን የራስጌና ግርጌ መልዕክቶች ያስተካክሉ" : "Customize header and footer messages printed on customer receipts"}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Receipt Header Note</label>
+            <label className="text-xs font-semibold text-slate-700">{t("receiptHeaderSubtitle")}</label>
             <textarea
               rows={3}
               disabled={!isOwner}
               value={receiptHeader}
               onChange={(e) => setReceiptHeader(e.target.value)}
-              placeholder="e.g. Welcome to EasyStock Outlet! Check our daily specials."
+              placeholder={language === "am" ? "እንኳን ደህና መጡ ወደ ሱቃችን!" : "e.g. Welcome to EasyStock Outlet! Check our daily specials."}
               className="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 resize-none font-mono text-xs"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700">Receipt Footer Note</label>
+            <label className="text-xs font-semibold text-slate-700">{t("receiptFooterSubtitle")}</label>
             <textarea
               rows={3}
               disabled={!isOwner}
               value={receiptFooter}
               onChange={(e) => setReceiptFooter(e.target.value)}
-              placeholder="e.g. Thank you for your patronage! Returns accepted within 7 days with valid receipt."
+              placeholder={language === "am" ? "ስለጎበኙን እናመሰግናለን! የተሸጠ ዕቃ በደረሰኝ በ 3 ቀናት ውስጥ ይመለሳል።" : "e.g. Thank you for your patronage! Returns accepted within 7 days with valid receipt."}
               className="w-full p-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 resize-none font-mono text-xs"
             />
           </div>
@@ -440,7 +439,7 @@ export function SettingsClient({
             <div className="flex justify-end pt-3 border-t border-slate-100">
               <Button type="submit" disabled={isPending} className="flex items-center gap-1.5">
                 <Save className="h-4 w-4" />
-                {isPending ? "Saving..." : "Save Receipt Text"}
+                {isPending ? t("loading") : t("saveSettingsBtn")}
               </Button>
             </div>
           )}
@@ -452,9 +451,9 @@ export function SettingsClient({
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Authorized Team Members</h2>
+              <h2 className="text-base font-bold text-slate-900">{t("staffManagement")}</h2>
               <p className="text-xs text-slate-500">
-                Manage cashier accounts, configure role permissions, and assign quick POS PINs
+                {language === "am" ? "የሰራተኛ አካውንት ይፍጠሩ፣ ሚስጥር ቁጥር (PIN) ይመድቡ እና ፈቃዶችን ያስተዳድሩ" : "Manage cashier accounts, configure role permissions, and assign quick POS PINs"}
               </p>
             </div>
 
@@ -463,7 +462,7 @@ export function SettingsClient({
                 onClick={() => setIsInviteModalOpen(true)}
                 className="flex items-center gap-1.5 self-start sm:self-auto bg-blue-600 hover:bg-blue-700 text-white"
               >
-                <Plus className="h-4 w-4" /> Add Staff Member
+                <Plus className="h-4 w-4" /> {t("addStaffBtn")}
               </Button>
             )}
           </div>
@@ -473,11 +472,11 @@ export function SettingsClient({
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-4">Staff Name & Email</th>
-                    <th className="py-3 px-4">Role</th>
-                    <th className="py-3 px-4 text-center">POS PIN</th>
-                    <th className="py-3 px-4">Operational Privileges</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
+                    <th className="py-3 px-4">{t("fullNameLabel")} & {t("emailLabel")}</th>
+                    <th className="py-3 px-4">{t("staffRole")}</th>
+                    <th className="py-3 px-4 text-center">{t("posPinLabel")}</th>
+                    <th className="py-3 px-4">{language === "am" ? "የተፈቀዱ ተግባራት" : "Operational Privileges"}</th>
+                    <th className="py-3 px-4 text-right">{t("actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -498,17 +497,21 @@ export function SettingsClient({
                               : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {s.role.replace("_", " ")}
+                          {s.role === ShopRole.SHOP_OWNER
+                            ? t("roleOwner")
+                            : s.role === ShopRole.SHOP_MANAGER
+                            ? t("roleManager")
+                            : t("roleShopkeeper")}
                         </span>
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
                         {s.hasPin ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                            <KeyRound className="h-3 w-3" /> Set
+                            <KeyRound className="h-3 w-3" /> {language === "am" ? "ተመድቧል" : "Set"}
                           </span>
                         ) : (
-                          <span className="text-slate-400 text-[11px]">No PIN</span>
+                          <span className="text-slate-400 text-[11px]">{language === "am" ? "ፒን የለም" : "No PIN"}</span>
                         )}
                       </td>
 
@@ -516,21 +519,21 @@ export function SettingsClient({
                         <div className="flex flex-wrap gap-1.5">
                           {s.canViewReports && (
                             <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              Reports
+                              {language === "am" ? "ሪፖርቶች" : "Reports"}
                             </span>
                           )}
                           {s.canApplyDiscount && (
                             <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              Discounts
+                              {language === "am" ? "ቅናሽ" : "Discounts"}
                             </span>
                           )}
                           {s.canAdjustStock && (
                             <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              Stock Adjust
+                              {language === "am" ? "ክምችት ማስተካከል" : "Stock Adjust"}
                             </span>
                           )}
                           {!s.canViewReports && !s.canApplyDiscount && !s.canAdjustStock && (
-                            <span className="text-slate-400 text-[10px]">Standard POS only</span>
+                            <span className="text-slate-400 text-[10px]">{language === "am" ? "መደበኛ መሸጫ ብቻ" : "Standard POS only"}</span>
                           )}
                         </div>
                       </td>
@@ -540,7 +543,7 @@ export function SettingsClient({
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => setEditingStaff(s)}
-                              title="Edit Permissions & PIN"
+                              title={language === "am" ? "ፈቃዶችንና ፒን አስተካክል" : "Edit Permissions & PIN"}
                               className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
                             >
                               <Edit2 className="h-4 w-4" />
@@ -548,7 +551,7 @@ export function SettingsClient({
                             {!s.isOrgOwner && (
                               <button
                                 onClick={() => handleRemoveStaff(s.id, s.fullName)}
-                                title="Remove Staff Member"
+                                title={language === "am" ? "ሰራተኛውን አስወግድ" : "Remove Staff Member"}
                                 className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                               >
                                 <Trash2 className="h-4 w-4" />

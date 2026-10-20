@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/decimal";
 import { Button } from "@/components/ui/button";
 import { receivePurchaseStockAction } from "@/app/actions/purchases";
 import { Truck, X, AlertCircle } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface ReceiveModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface ReceiveModalProps {
 }
 
 export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSuccess }: ReceiveModalProps) {
+  const { t, language } = useLanguage();
   const [isPending, startTransition] = useTransition();
   const [receiveQuantities, setReceiveQuantities] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState("");
@@ -39,7 +41,7 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
       }));
 
     if (itemsToReceive.length === 0) {
-      setErrorMessage("Please enter received quantities for at least one item.");
+      setErrorMessage(language === "am" ? "እባክዎ ቢያንስ ለአንድ ዕቃ የተረከቡትን ብዛት ያስገቡ" : "Please enter received quantities for at least one item.");
       return;
     }
 
@@ -51,7 +53,7 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
       });
 
       if (!result.success) {
-        setErrorMessage(result.error || "Failed to receive purchase stock");
+        setErrorMessage(result.error || (language === "am" ? "የዕቃ ርክክቡን መመዝገብ አልተቻለም" : "Failed to receive purchase stock"));
       } else {
         onSuccess?.();
         onClose();
@@ -68,9 +70,9 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
               <Truck className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Receive Goods (GRN)</h2>
+              <h2 className="text-base font-bold text-slate-900">{t("receiveGoodsGrn")}</h2>
               <p className="text-xs text-slate-500">
-                PO: {purchaseOrder.poNumber} — Supplier: {purchaseOrder.supplier?.name}
+                {t("poNumber")}: {purchaseOrder.poNumber} — {t("supplierName")}: {purchaseOrder.supplier?.name}
               </p>
             </div>
           </div>
@@ -92,7 +94,7 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
 
           <div className="space-y-3">
             <label className="block text-xs font-semibold text-slate-700">
-              Verify Received Quantities
+              {t("verifyReceivedQuantities")}
             </label>
             <div className="border border-slate-200 rounded-xl divide-y divide-slate-100">
               {purchaseOrder.items?.map((item: any) => {
@@ -107,7 +109,7 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
                         {item.variant?.product?.name || "Product"}
                       </div>
                       <div className="text-slate-500">
-                        Ordered: {item.orderedQuantity} | Received: {item.receivedQuantity} | Pending:{" "}
+                        {t("orderedQty")}: {item.orderedQuantity} | {t("receivedSoFar")}: {item.receivedQuantity} | {language === "am" ? "የቀረው" : "Pending"}:{" "}
                         <span className={pending > 0 ? "text-amber-600 font-semibold" : "text-emerald-600"}>
                           {pending}
                         </span>
@@ -115,7 +117,7 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-slate-500">Receive:</span>
+                      <span className="text-slate-500">{t("receivingNow")}:</span>
                       <input
                         type="number"
                         min="0"
@@ -136,10 +138,10 @@ export function ReceiveModal({ isOpen, onClose, purchaseOrder, currency, onSucce
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" isLoading={isPending}>
-              Confirm Goods Receipt & Increment Stock
+              {t("confirmReceiveStockBtn")}
             </Button>
           </div>
         </form>

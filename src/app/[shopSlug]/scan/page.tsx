@@ -68,6 +68,7 @@ export default async function ScanPage({ params, searchParams }: ScanPageProps) 
     barcode: p.barcode,
     category: p.category,
     sellingPrice: p.sellingPrice,
+    costPrice: p.costPrice,
     currentStock: p.currentStock,
     unit: p.unitOfMeasure,
   }));

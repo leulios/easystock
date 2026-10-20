@@ -10,6 +10,7 @@ import { archiveProductAction } from "@/app/actions/products";
 import { Search, Plus, Trash2, AlertTriangle, Package, Filter, Barcode, Upload, Download } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface ProductItem {
   id: string;
@@ -41,6 +42,7 @@ export function ProductListClient({
   currency,
 }: ProductListClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [products, setProducts] = useState<ProductItem[]>(initialProducts);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
@@ -62,7 +64,7 @@ export function ProductListClient({
   });
 
   const handleArchive = (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to archive "${name}"? Historical sales will remain intact.`)) {
+    if (!confirm(t("areYouSure"))) {
       return;
     }
 
@@ -72,7 +74,7 @@ export function ProductListClient({
         setProducts((prev) => prev.filter((p) => p.id !== id));
         router.refresh();
       } else {
-        alert(result.error || "Failed to archive product");
+        alert(result.error || t("error"));
       }
     });
   };
@@ -82,9 +84,9 @@ export function ProductListClient({
       {/* Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Products & Catalog</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("productsTitle")}</h1>
           <p className="text-sm text-slate-500">
-            Manage your centralized SKU inventory, barcodes, and pricing
+            {t("productsSubtitle")}
           </p>
         </div>
 
@@ -94,18 +96,18 @@ export function ProductListClient({
             download
             className="inline-flex items-center px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
-            <Download className="h-3.5 w-3.5 mr-1.5 text-slate-500" /> Export CSV
+            <Download className="h-3.5 w-3.5 mr-1.5 text-slate-500" /> {t("exportCsv")}
           </a>
 
           <Link
             href={`/${shopSlug}/products/import`}
             className="inline-flex items-center px-3 py-2 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
           >
-            <Upload className="h-3.5 w-3.5 mr-1.5 text-slate-500" /> Import CSV
+            <Upload className="h-3.5 w-3.5 mr-1.5 text-slate-500" /> {t("navImportItems")}
           </Link>
 
           <Button onClick={() => setIsModalOpen(true)} className="text-xs">
-            <Plus className="h-4 w-4 mr-1.5" /> Add New Product
+            <Plus className="h-4 w-4 mr-1.5" /> {t("addProductBtn")}
           </Button>
         </div>
       </div>
@@ -118,7 +120,7 @@ export function ProductListClient({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by product name, SKU, or barcode..."
+            placeholder={t("searchItemPlaceholder")}
             className="w-full h-10 pl-9 pr-4 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
           />
         </div>
@@ -129,7 +131,7 @@ export function ProductListClient({
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="w-full h-10 px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
           >
-            <option value="">All Categories</option>
+            <option value="">{t("all")}</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

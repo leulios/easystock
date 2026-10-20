@@ -105,6 +105,48 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
     searchInputRef.current?.focus();
   }, []);
 
+  // Hardware Scanner Integration (USB / Bluetooth Keyboard Wedge)
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastKeyTime > 65) {
+        buffer = "";
+      }
+      lastKeyTime = now;
+
+      if (e.key === "Enter") {
+        if (buffer.length >= 3) {
+          e.preventDefault();
+          const clean = buffer.trim().toLowerCase();
+          const match = products.find(
+            (p) =>
+              (p.barcode && p.barcode.toLowerCase() === clean) ||
+              p.sku.toLowerCase() === clean
+          );
+          if (match) {
+            addToCart(match);
+          }
+          buffer = "";
+        }
+      } else if (e.key.length === 1) {
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [products]);
+
   const addToCart = (product: POSProduct) => {
     setErrorMessage(null);
     setCart((prev) => {
@@ -545,70 +587,91 @@ export function POSTerminal({ products, categories, customers = [], shopSlug, sh
               <button
                 type="button"
                 onClick={() => setPaymentMethod(PaymentMethod.CASH)}
-                className={`py-1.5 px-1.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                className={`py-1.5 px-1 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
                   paymentMethod === PaymentMethod.CASH
                     ? "border-blue-600 bg-blue-50 text-blue-700"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
-                <Banknote className="h-3.5 w-3.5" /> Cash
+                <Banknote className="h-3.5 w-3.5" /> {t("payCash")}
               </button>
               <button
                 type="button"
-                onClick={() => setPaymentMethod(PaymentMethod.CREDIT_CARD)}
-                className={`py-1.5 px-1.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
-                  paymentMethod === PaymentMethod.CREDIT_CARD
+                onClick={() => setPaymentMethod(PaymentMethod.BANK_TRANSFER)}
+                className={`py-1.5 px-1 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                  paymentMethod === PaymentMethod.BANK_TRANSFER
                     ? "border-blue-600 bg-blue-50 text-blue-700"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
-                <CreditCard className="h-3.5 w-3.5" /> Card
+                <CreditCard className="h-3.5 w-3.5" /> {t("payCbeBirr")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod(PaymentMethod.MOBILE_MONEY)}
-                className={`py-1.5 px-1.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                className={`py-1.5 px-1 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
                   paymentMethod === PaymentMethod.MOBILE_MONEY
                     ? "border-blue-600 bg-blue-50 text-blue-700"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
-                <Smartphone className="h-3.5 w-3.5" /> Telebirr
+                <Smartphone className="h-3.5 w-3.5" /> {t("payTelebirr")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaymentMethod(PaymentMethod.STORE_CREDIT)}
-                className={`py-1.5 px-1.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
+                className={`py-1.5 px-1 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1 transition-colors ${
                   paymentMethod === PaymentMethod.STORE_CREDIT
                     ? "border-purple-600 bg-purple-50 text-purple-700 font-bold"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
-                <Users className="h-3.5 w-3.5" /> Credit
+                <Users className="h-3.5 w-3.5" /> {t("payCredit")}
               </button>
             </div>
           </div>
 
           {paymentMethod === PaymentMethod.CASH && (
-            <div className="flex items-center gap-2 pt-1">
-              <div className="flex-1">
-                <input
-                  type="number"
-                  step="0.01"
-                  placeholder={`${t("amountReceived")} (default: ${grandTotal.toFixed(2)})`}
-                  value={tenderedAmount}
-                  onChange={(e) => setTenderedAmount(e.target.value)}
-                  className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
-                />
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+                <button
+                  type="button"
+                  onClick={() => setTenderedAmount(String(grandTotal))}
+                  className="py-1 px-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold shrink-0"
+                >
+                  {t("exactAmount")}
+                </button>
+                {[100, 200, 500, 1000].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setTenderedAmount(String(amt))}
+                    className="py-1 px-2 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold shrink-0"
+                  >
+                    {amt}
+                  </button>
+                ))}
               </div>
-              {changeDue > 0 && (
-                <div className="text-right text-xs">
-                  <span className="text-slate-400 text-[10px]">{t("changeDue")}: </span>
-                  <span className="font-bold text-emerald-600">
-                    {formatCurrency(changeDue, shop.currency)}
-                  </span>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder={`${t("amountReceived")} (default: ${grandTotal.toFixed(2)})`}
+                    value={tenderedAmount}
+                    onChange={(e) => setTenderedAmount(e.target.value)}
+                    className="w-full h-9 px-3 text-xs bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium"
+                  />
                 </div>
-              )}
+                {changeDue > 0 && (
+                  <div className="text-right text-xs shrink-0">
+                    <span className="text-slate-400 text-[10px]">{t("changeDue")}: </span>
+                    <span className="font-bold text-emerald-600 font-mono">
+                      {formatCurrency(changeDue, shop.currency)}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

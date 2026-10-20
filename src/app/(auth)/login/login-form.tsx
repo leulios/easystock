@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { AlertCircle } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface LoginFormProps {
   redirectUrl?: string;
@@ -13,6 +14,7 @@ interface LoginFormProps {
 
 export function LoginForm({ redirectUrl }: LoginFormProps) {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -27,7 +29,7 @@ export function LoginForm({ redirectUrl }: LoginFormProps) {
     startTransition(async () => {
       const result = await loginAction(null, formData);
       if (!result.success) {
-        setErrorMessage(result.error || "Login failed.");
+        setErrorMessage(result.error || t("error"));
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
@@ -50,7 +52,7 @@ export function LoginForm({ redirectUrl }: LoginFormProps) {
       )}
 
       <Input
-        label="Email Address"
+        label={t("emailLabel")}
         name="email"
         type="email"
         autoComplete="email"
@@ -60,7 +62,7 @@ export function LoginForm({ redirectUrl }: LoginFormProps) {
       />
 
       <Input
-        label="Password"
+        label={t("passwordLabel")}
         name="password"
         type="password"
         autoComplete="current-password"
@@ -71,7 +73,7 @@ export function LoginForm({ redirectUrl }: LoginFormProps) {
 
       <div className="pt-2">
         <Button type="submit" className="w-full" isLoading={isPending}>
-          Sign In to Workspace
+          {t("signInBtn")}
         </Button>
       </div>
     </form>

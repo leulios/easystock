@@ -5,6 +5,7 @@ import { createExpenseAction } from "@/app/actions/expenses";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Receipt, X, AlertCircle } from "lucide-react";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface NewExpenseModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ const CATEGORIES = [
 ] as const;
 
 export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExpenseModalProps) {
+  const { t, language } = useLanguage();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -45,12 +47,26 @@ export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExp
     startTransition(async () => {
       const result = await createExpenseAction(data);
       if (!result.success) {
-        setErrorMessage(result.error || "Failed to record expense");
+        setErrorMessage(result.error || (language === "am" ? "ወጪውን መመዝገብ አልተቻለም" : "Failed to record expense"));
       } else {
         onSuccess?.();
         onClose();
       }
     });
+  };
+
+  const getCategoryLabel = (cat: string) => {
+    if (language !== "am") return cat;
+    switch (cat) {
+      case "Rent": return "ኪራይ (Rent)";
+      case "Utilities": return "መብራትና ውሃ (Utilities)";
+      case "Salaries": return "ደመወዝ (Salaries)";
+      case "Supplies": return "የሱቅ ዕቃዎች (Supplies)";
+      case "Marketing": return "ማስታወቂያ (Marketing)";
+      case "Maintenance": return "ጥገና (Maintenance)";
+      case "Insurance": return "ኢንሹራንስ (Insurance)";
+      default: return "ሌላ (Other)";
+    }
   };
 
   return (
@@ -62,8 +78,8 @@ export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExp
               <Receipt className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Record Shop Expense</h2>
-              <p className="text-xs text-slate-500">Track operating overhead and utility costs</p>
+              <h2 className="text-base font-bold text-slate-900">{t("recordExpenseModalTitle")}</h2>
+              <p className="text-xs text-slate-500">{t("recordExpenseModalDesc")}</p>
             </div>
           </div>
           <button
@@ -83,7 +99,7 @@ export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExp
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5">Expense Category</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t("expenseCategory")}</label>
             <select
               name="category"
               required
@@ -91,14 +107,14 @@ export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExp
             >
               {CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
-                  {cat}
+                  {getCategoryLabel(cat)}
                 </option>
               ))}
             </select>
           </div>
 
           <Input
-            label={`Amount (${currency})`}
+            label={`${t("expenseAmount")} (${currency})`}
             name="amount"
             type="number"
             step="0.01"
@@ -108,7 +124,7 @@ export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExp
           />
 
           <Input
-            label="Date Incurred"
+            label={t("expenseDate")}
             name="expenseDate"
             type="date"
             defaultValue={new Date().toISOString().slice(0, 10)}
@@ -116,17 +132,17 @@ export function NewExpenseModal({ isOpen, onClose, currency, onSuccess }: NewExp
           />
 
           <Input
-            label="Description / Purpose"
+            label={t("expenseDescription")}
             name="description"
-            placeholder="e.g. Electricity bill for October, store cleaning supplies"
+            placeholder={language === "am" ? "ለምሳሌ፡ የጥቅምት ወር መብራት፣ የጽዳት ዕቃዎች..." : "e.g. Electricity bill for October, store cleaning supplies"}
           />
 
           <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" isLoading={isPending}>
-              Record Expense
+              {t("addExpenseBtn")}
             </Button>
           </div>
         </form>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Download, DollarSign, Calendar } from "lucide-react";
 import { DateRangePreset } from "@/lib/services/reporting-service";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/context";
 
 interface SalesReportClientProps {
   sales: any[];
@@ -17,6 +18,7 @@ interface SalesReportClientProps {
 
 export function SalesReportClient({ sales, period, shopSlug, currency }: SalesReportClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [currentPeriod, setCurrentPeriod] = useState<DateRangePreset>(period);
 
   const handlePeriodChange = (p: DateRangePreset) => {
@@ -30,6 +32,17 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
   const totalCOGS = sales.reduce((sum, s) => sum + s.cogs, 0);
   const totalNetMargin = sales.reduce((sum, s) => sum + s.margin, 0);
 
+  const getPresetLabel = (p: DateRangePreset) => {
+    switch (p) {
+      case "today": return t("dateRangeToday");
+      case "7d": return t("dateRangeWeek");
+      case "30d": return language === "am" ? "30 ቀናት" : "30 Days";
+      case "month": return t("dateRangeMonth");
+      case "all": return t("dateRangeAll");
+      default: return p;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -39,13 +52,13 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
             href={`/${shopSlug}/reports`}
             className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium mb-1.5"
           >
-            <ArrowLeft className="h-3.5 w-3.5" /> Back to Reports Hub
+            <ArrowLeft className="h-3.5 w-3.5" /> {t("backToReportsHub")}
           </Link>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Sales & Revenue Statement
+            {t("salesMarginReport")}
           </h1>
           <p className="text-sm text-slate-500">
-            Chronological audit of transactions, taxes collected, and tender breakdowns
+            {t("salesReportDesc")}
           </p>
         </div>
 
@@ -62,15 +75,7 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                {p === "today"
-                  ? "Today"
-                  : p === "7d"
-                  ? "7 Days"
-                  : p === "30d"
-                  ? "30 Days"
-                  : p === "month"
-                  ? "This Month"
-                  : "All Time"}
+                {getPresetLabel(p)}
               </button>
             ))}
           </div>
@@ -80,7 +85,7 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
             download
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-sm transition-colors"
           >
-            <Download className="h-3.5 w-3.5 text-blue-600" /> Export CSV
+            <Download className="h-3.5 w-3.5 text-blue-600" /> {t("exportCsv")}
           </a>
         </div>
       </div>
@@ -89,27 +94,27 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-            Total Sales
+            {t("grossRevenue")}
           </span>
           <div className="text-lg font-extrabold text-slate-900 mt-0.5">
             {formatCurrency(totalGross, currency)}
           </div>
-          <span className="text-[10px] text-slate-500">{sales.length} transactions</span>
+          <span className="text-[10px] text-slate-500">{sales.length} {t("transactionCount")}</span>
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-            Discounts
+            {t("totalDiscountsGiven")}
           </span>
           <div className="text-lg font-extrabold text-rose-600 mt-0.5">
             {formatCurrency(totalDiscount, currency)}
           </div>
-          <span className="text-[10px] text-slate-500">Customer savings</span>
+          <span className="text-[10px] text-slate-500">{language === "am" ? "የተደረገ ቅናሽ" : "Customer savings"}</span>
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-            Tax Collected
+            {t("totalTaxCollected")}
           </span>
           <div className="text-lg font-extrabold text-slate-900 mt-0.5">
             {formatCurrency(totalTax, currency)}
@@ -119,23 +124,23 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
 
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-            Total COGS
+            {t("costOfGoodsSold")}
           </span>
           <div className="text-lg font-extrabold text-slate-700 mt-0.5">
             {formatCurrency(totalCOGS, currency)}
           </div>
-          <span className="text-[10px] text-slate-500">Unit wholesale cost</span>
+          <span className="text-[10px] text-slate-500">{language === "am" ? "የዕቃዎች የግዢ ዋጋ" : "Unit wholesale cost"}</span>
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
           <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-            Gross Margin
+            {t("grossProfit")}
           </span>
           <div className="text-lg font-extrabold text-emerald-600 mt-0.5">
             {formatCurrency(totalNetMargin, currency)}
           </div>
           <span className="text-[10px] text-emerald-700 font-semibold">
-            {totalGross > 0 ? Math.round((totalNetMargin / (totalGross - totalTax)) * 100) : 0}% margin
+            {totalGross > 0 ? Math.round((totalNetMargin / (totalGross - totalTax)) * 100) : 0}% {language === "am" ? "ትርፍ" : "margin"}
           </span>
         </div>
       </div>
@@ -146,22 +151,22 @@ export function SalesReportClient({ sales, period, shopSlug, currency }: SalesRe
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                <th className="py-3 px-4">Receipt #</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Customer</th>
-                <th className="py-3 px-4 text-right">Subtotal</th>
-                <th className="py-3 px-4 text-right">Tax</th>
-                <th className="py-3 px-4 text-right">Total</th>
-                <th className="py-3 px-4 text-right">Gross Margin</th>
-                <th className="py-3 px-4">Payment</th>
-                <th className="py-3 px-4 text-center">Status</th>
+                <th className="py-3 px-4">{language === "am" ? "የደረሰኝ #" : "Receipt #"}</th>
+                <th className="py-3 px-4">{t("date")}</th>
+                <th className="py-3 px-4">{t("customerName")}</th>
+                <th className="py-3 px-4 text-right">{t("subtotal")}</th>
+                <th className="py-3 px-4 text-right">{t("tax")}</th>
+                <th className="py-3 px-4 text-right">{t("totalToPay")}</th>
+                <th className="py-3 px-4 text-right">{t("grossProfit")}</th>
+                <th className="py-3 px-4">{t("paymentMethod")}</th>
+                <th className="py-3 px-4 text-center">{t("status")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs">
               {sales.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-slate-400">
-                    No sales recorded for the selected date range.
+                    {language === "am" ? "ለተመረጠው የጊዜ ገደብ ምንም የሽያጭ መዝገብ የለም።" : "No sales recorded for the selected date range."}
                   </td>
                 </tr>
               ) : (

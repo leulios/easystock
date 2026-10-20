@@ -2,7 +2,15 @@
 
 import { getCurrentContext } from "./auth";
 import { stockAdjustmentSchema, StockAdjustmentInput } from "@/lib/validations/catalog";
-import { adjustStock, listStockMovements, ListMovementsOptions, transferStockBetweenShops, TransferStockInput } from "@/lib/services/inventory-service";
+import {
+  adjustStock,
+  listStockMovements,
+  ListMovementsOptions,
+  transferStockBetweenShops,
+  TransferStockInput,
+  batchReceiveStock,
+  BatchStockInInput,
+} from "@/lib/services/inventory-service";
 import { revalidatePath } from "next/cache";
 
 export async function adjustStockAction(data: StockAdjustmentInput) {
@@ -66,3 +74,23 @@ export async function transferStockAction(data: TransferStockInput) {
     return { success: false as const, error: err.message || "Stock transfer failed." };
   }
 }
+
+export async function batchStockInAction(data: BatchStockInInput) {
+  const context = await getCurrentContext();
+  if (!context) {
+    return { success: false as const, error: "Not authenticated" };
+  }
+
+  try {
+    const result = await batchReceiveStock(context, data);
+    revalidatePath(`/${context.shopId}/inventory`);
+    revalidatePath(`/${context.shopId}/inventory/movements`);
+    revalidatePath(`/${context.shopId}/products`);
+    revalidatePath(`/${context.shopId}/pos`);
+    revalidatePath("/scan");
+    return { success: true as const, result };
+  } catch (err: any) {
+    return { success: false as const, error: err.message || "Failed to receive stock" };
+  }
+}
+

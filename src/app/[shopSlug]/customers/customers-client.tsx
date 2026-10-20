@@ -8,6 +8,7 @@ import { CreditModal } from "./credit-modal";
 import { CustomerHistoryModal } from "./customer-history-modal";
 import { deleteCustomerAction } from "@/app/actions/customers";
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/i18n/context";
 import {
   Users,
   Search,
@@ -44,6 +45,7 @@ interface CustomersClientProps {
 
 export function CustomersClient({ initialCustomers, shop }: CustomersClientProps) {
   const router = useRouter();
+  const { t, language } = useLanguage();
   const [search, setSearch] = useState("");
   const [filterCreditOnly, setFilterCreditOnly] = useState(false);
 
@@ -72,12 +74,12 @@ export function CustomersClient({ initialCustomers, shop }: CustomersClientProps
   );
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to archive customer "${name}"?`)) return;
+    if (!confirm(t("areYouSure"))) return;
     const res = await deleteCustomerAction(id);
     if (res.success) {
       router.refresh();
     } else {
-      alert(res.error || "Failed to delete customer");
+      alert(res.error || t("error"));
     }
   };
 
@@ -87,10 +89,10 @@ export function CustomersClient({ initialCustomers, shop }: CustomersClientProps
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Customer Directory & Accounts
+            {t("customersTitle")}
           </h1>
           <p className="text-xs text-slate-500">
-            Manage customer relationships, track purchase histories, and oversee outstanding store credit
+            {t("customersSubtitle")}
           </p>
         </div>
 
@@ -101,7 +103,7 @@ export function CustomersClient({ initialCustomers, shop }: CustomersClientProps
           }}
           className="flex items-center gap-1.5 self-start sm:self-auto bg-blue-600 hover:bg-blue-700 text-white"
         >
-          <Plus className="h-4 w-4" /> Add Customer
+          <Plus className="h-4 w-4" /> {t("addNewCustomer")}
         </Button>
       </div>
 
@@ -109,32 +111,38 @@ export function CustomersClient({ initialCustomers, shop }: CustomersClientProps
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Total Customers
+            {language === "am" ? "ጠቅላላ ደንበኞች" : "Total Customers"}
           </span>
           <div className="text-2xl font-extrabold text-slate-900 font-mono">
             {initialCustomers.length}
           </div>
-          <span className="text-[11px] text-slate-400">Registered client accounts</span>
+          <span className="text-[11px] text-slate-400">
+            {language === "am" ? "የተመዘገቡ የደንበኛ አካውንቶች" : "Registered client accounts"}
+          </span>
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Accounts with Credit Due
+            {t("accountsWithCredit")}
           </span>
           <div className="text-2xl font-extrabold text-amber-600 font-mono">
             {initialCustomers.filter((c) => c.outstandingCredit > 0).length}
           </div>
-          <span className="text-[11px] text-slate-400">Customers with pending balances</span>
+          <span className="text-[11px] text-slate-400">
+            {language === "am" ? "ያልተከፈለ ቀሪ ሂሳብ ያላቸው" : "Customers with pending balances"}
+          </span>
         </div>
 
         <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1">
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Total Outstanding Credit
+            {t("totalOutstandingCredit")}
           </span>
           <div className="text-2xl font-extrabold text-rose-600 font-mono">
             {formatCurrency(totalOutstandingCredit, shop.currency)}
           </div>
-          <span className="text-[11px] text-slate-400">Store receivables balance</span>
+          <span className="text-[11px] text-slate-400">
+            {language === "am" ? "መሰብሰብ ያለበት የሱቅ ገቢ" : "Store receivables balance"}
+          </span>
         </div>
       </div>
 
