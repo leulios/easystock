@@ -108,6 +108,20 @@ export interface Translations {
   registerNewProduct: string;
   readyToScan: string;
   readyToScanDesc: string;
+  quickRegisterProductTitle: string;
+  quickRegisterProductDesc: string;
+  initialStockLabel: string;
+  quickSellNowBtn: string;
+  quickStockInNowBtn: string;
+  addToCartAndScanMore: string;
+  stockRemaining: string;
+  itemRegisteredAndStocked: string;
+  quickCategoryGeneral: string;
+  quickCategoryBooks: string;
+  quickCategoryStationery: string;
+  quickCategoryElectronics: string;
+  quickCategoryGroceries: string;
+  quickCategoryClothing: string;
 
   // Stock In Mode
   stockInTitle: string;
@@ -472,6 +486,20 @@ export const translations: Record<Language, Translations> = {
     registerNewProduct: "Register as New Product",
     readyToScan: "Ready to Scan",
     readyToScanDesc: "Point phone camera at any barcode, use a Bluetooth scanner, or type below.",
+    quickRegisterProductTitle: "Add New Product to Inventory",
+    quickRegisterProductDesc: "This barcode was not found. Enter product details to save and add it to your inventory.",
+    initialStockLabel: "Quantity to Add to Inventory",
+    quickSellNowBtn: "Sell Now & Deduct Stock",
+    quickStockInNowBtn: "Add to Stock Now",
+    addToCartAndScanMore: "Add to Cart & Scan More",
+    stockRemaining: "Remaining stock",
+    itemRegisteredAndStocked: "Product registered and added to inventory!",
+    quickCategoryGeneral: "General",
+    quickCategoryBooks: "Books",
+    quickCategoryStationery: "Stationery",
+    quickCategoryElectronics: "Electronics",
+    quickCategoryGroceries: "Groceries",
+    quickCategoryClothing: "Clothing",
 
     // Stock In Mode
     stockInTitle: "Stock In & Inventory Receiving",
@@ -835,6 +863,20 @@ export const translations: Record<Language, Translations> = {
     registerNewProduct: "እንደ አዲስ ዕቃ መዝግብ",
     readyToScan: "ዕቃ ለመቃኘት ተዘጋጅቷል",
     readyToScanDesc: "የስልክዎን ካሜራ በዕቃው ባርኮድ ላይ ያሳዩ፣ ወይም በብሉቱዝ መቃኛ ይጠቀሙ።",
+    quickRegisterProductTitle: "አዲስ ዕቃ ወደ ክምችት ጨምር",
+    quickRegisterProductDesc: "ይህ ባርኮድ በክምችት ውስጥ አልተገኘም። መረጃውን ሞልተው ወዲያውኑ ወደ ክምችት ያስገቡት።",
+    initialStockLabel: "ወደ ክምችት የሚገባ የመጀመሪያ ብዛት",
+    quickSellNowBtn: "ሽጥና ከክምችት ቀንስ",
+    quickStockInNowBtn: "ወዲያውኑ ክምችት ላይ ጨምር",
+    addToCartAndScanMore: "ወደ ቅርጫት ጨምር",
+    stockRemaining: "ቀሪ ክምችት",
+    itemRegisteredAndStocked: "ዕቃው ተመዝግቦ ወደ ክምችት ገብቷል!",
+    quickCategoryGeneral: "አጠቃላይ",
+    quickCategoryBooks: "መጽሐፍት",
+    quickCategoryStationery: "ደብተርና እስክሪብቶ",
+    quickCategoryElectronics: "ኤሌክትሮኒክስ",
+    quickCategoryGroceries: "ምግብና ሸቀጣ ሸቀጥ",
+    quickCategoryClothing: "ልብስ",
 
     // Stock In Mode
     stockInTitle: "የዕቃ ግዢና ክምችት መረከቢያ",

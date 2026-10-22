@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/decimal";
 import { checkoutSaleAction } from "@/app/actions/sales";
 import { batchStockInAction } from "@/app/actions/inventory";
 import { logoutAction } from "@/app/actions/auth";
+import { quickRegisterProductAction } from "@/app/actions/products";
 import { useLanguage } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
 import { PaymentMethod } from "@prisma/client";
@@ -73,6 +74,26 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
   const router = useRouter();
   const { t, language } = useLanguage();
 
+  // Catalog state - mutable so newly registered products can be scanned immediately
+  const [catalog, setCatalog] = useState<ProductItem[]>(products);
+
+  // Active Scanned Item (for direct 1-tap Sell / Stock In / Stepper)
+  const [activeScannedItem, setActiveScannedItem] = useState<{
+    product: ProductItem;
+    quantity: number;
+  } | null>(null);
+
+  // In-place Quick Register Modal state
+  const [isQuickRegisterOpen, setIsQuickRegisterOpen] = useState<boolean>(false);
+  const [quickBarcode, setQuickBarcode] = useState<string>("");
+  const [quickName, setQuickName] = useState<string>("");
+  const [quickCategory, setQuickCategory] = useState<string>("Books");
+  const [quickCustomCategory, setQuickCustomCategory] = useState<string>("");
+  const [quickSellingPrice, setQuickSellingPrice] = useState<string>("");
+  const [quickCostPrice, setQuickCostPrice] = useState<string>("");
+  const [quickInitialStock, setQuickInitialStock] = useState<string>("1");
+  const [isRegistering, setIsRegistering] = useState<boolean>(false);
+
   // Primary Operational Mode: "sell" | "stock_in"
   const [mode, setMode] = useState<"sell" | "stock_in">("sell");
 
@@ -120,6 +141,11 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
   // Action transitions
   const [isPending, startTransition] = useTransition();
 
+  // Keep catalog in sync if props change
+  useEffect(() => {
+    setCatalog(products);
+  }, [products]);
+
   // Show transient toast
   const showToast = (text: string, type: "success" | "error" | "info" = "success") => {
     setToastMessage({ text, type });
@@ -142,6 +168,29 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
       gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.12);
       osc.start();
       osc.stop(audioCtx.currentTime + 0.12);
+    } catch {
+      // Audio not permitted
+    }
+  };
+
+  // Pleasant success chime (E5 -> B5)
+  const playSuccessSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const playTone = (freq: number, delay: number, dur: number) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime + delay);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime + delay);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + delay + dur);
+        osc.start(audioCtx.currentTime + delay);
+        osc.stop(audioCtx.currentTime + delay + dur);
+      };
+      playTone(659.25, 0, 0.1);
+      playTone(987.77, 0.08, 0.18);
     } catch {
       // Audio not permitted
     }
@@ -288,9 +337,9 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [mode, products, saleCart, receivingList]);
+  }, [mode, catalog, saleCart, receivingList, activeScannedItem]);
 
-  // Code detected handler with mode-specific handling and duplicate throttling
+  // Code detected handler with mode-specific handling, auto-registration and duplicate throttling
   const handleCodeDetected = (code: string) => {
     const now = Date.now();
     const cleanCode = code.trim();
@@ -303,7 +352,7 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     lastScanCodeRef.current = cleanCode;
     lastScanTimeRef.current = now;
 
-    const matched = products.find(
+    const matched = catalog.find(
       (p) =>
         (p.barcode && p.barcode.toLowerCase() === cleanCode.toLowerCase()) ||
         p.sku.toLowerCase() === cleanCode.toLowerCase()
@@ -312,90 +361,233 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     if (!matched) {
       playBeep(440);
       setNotFoundCode(cleanCode);
+      setQuickBarcode(cleanCode);
+      setQuickName("");
+      setQuickSellingPrice("");
+      setQuickCostPrice("");
+      setQuickInitialStock(mode === "stock_in" ? "5" : "1");
+      setIsQuickRegisterOpen(true);
       showToast(`${t("unrecognizedBarcode")}: ${cleanCode}`, "error");
       return;
     }
 
     setNotFoundCode(null);
 
+    // If active scanned item is the same product, increment its quantity
+    if (activeScannedItem && activeScannedItem.product.variantId === matched.variantId) {
+      setActiveScannedItem((prev) => (prev ? { ...prev, quantity: prev.quantity + 1 } : null));
+    } else {
+      // If there was a different active scanned item, make sure it's kept in cart / list
+      if (activeScannedItem) {
+        if (mode === "sell") {
+          setSaleCart((prev) => {
+            const idx = prev.findIndex((it) => it.product.variantId === activeScannedItem.product.variantId);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx].quantity += activeScannedItem.quantity;
+              return updated;
+            }
+            return [...prev, { product: activeScannedItem.product, quantity: activeScannedItem.quantity }];
+          });
+        } else {
+          setReceivingList((prev) => {
+            const idx = prev.findIndex((it) => it.product.variantId === activeScannedItem.product.variantId);
+            if (idx >= 0) {
+              const updated = [...prev];
+              updated[idx].quantity += activeScannedItem.quantity;
+              return updated;
+            }
+            return [
+              ...prev,
+              {
+                product: activeScannedItem.product,
+                quantity: activeScannedItem.quantity,
+                costPrice: activeScannedItem.product.costPrice || 0,
+              },
+            ];
+          });
+        }
+      }
+      setActiveScannedItem({ product: matched, quantity: 1 });
+    }
+
     if (mode === "sell") {
-      // SALES MODE: Add or Increment in Sale Cart
+      // SALES MODE Feedback
       playBeep(880);
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         navigator.vibrate([60, 30, 60]);
       }
-
-      setSaleCart((prev) => {
-        const existingIndex = prev.findIndex((item) => item.product.variantId === matched.variantId);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex].quantity += 1;
-          showToast(`+1 ${matched.name} (${updated[existingIndex].quantity} ${t("inStock")})`);
-          return updated;
-        } else {
-          showToast(`+1 ${matched.name}`);
-          return [...prev, { product: matched, quantity: 1 }];
-        }
-      });
+      showToast(`${matched.name} (${matched.currentStock} ${t("inStock")})`);
     } else {
-      // STOCK IN MODE: Add or Increment in Receiving Staging List
-      playBeep(1046.5); // C6 tone
+      // STOCK IN MODE Feedback
+      playBeep(1046.5);
       if (typeof navigator !== "undefined" && navigator.vibrate) {
         navigator.vibrate([100]);
       }
-
-      setReceivingList((prev) => {
-        const existingIndex = prev.findIndex((item) => item.product.variantId === matched.variantId);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex].quantity += 1;
-          showToast(`+1 ${matched.name} (${t("stockInItemAdded")}: ${updated[existingIndex].quantity})`);
-          return updated;
-        } else {
-          showToast(`${matched.name} ${t("stockInItemAdded")}`);
-          return [
-            ...prev,
-            {
-              product: matched,
-              quantity: 1,
-              costPrice: matched.costPrice || 0,
-            },
-          ];
-        }
-      });
+      showToast(`${matched.name} (${t("previousStock")}: ${matched.currentStock})`);
     }
   };
 
   // Add product from manual search
   const handleAddManualProduct = (p: ProductItem) => {
+    if (activeScannedItem && activeScannedItem.product.variantId === p.variantId) {
+      setActiveScannedItem((prev) => (prev ? { ...prev, quantity: prev.quantity + 1 } : null));
+    } else {
+      setActiveScannedItem({ product: p, quantity: 1 });
+    }
+
     if (mode === "sell") {
       playBeep(880);
-      setSaleCart((prev) => {
-        const existingIndex = prev.findIndex((item) => item.product.variantId === p.variantId);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex].quantity += 1;
-          showToast(`+1 ${p.name}`);
-          return updated;
-        }
-        showToast(`+1 ${p.name}`);
-        return [...prev, { product: p, quantity: 1 }];
-      });
+      showToast(`${p.name}`);
     } else {
       playBeep(1046.5);
-      setReceivingList((prev) => {
-        const existingIndex = prev.findIndex((item) => item.product.variantId === p.variantId);
-        if (existingIndex >= 0) {
-          const updated = [...prev];
-          updated[existingIndex].quantity += 1;
-          showToast(`+1 ${p.name}`);
-          return updated;
-        }
-        showToast(`${p.name} ${t("stockInItemAdded")}`);
-        return [...prev, { product: p, quantity: 1, costPrice: p.costPrice || 0 }];
-      });
+      showToast(`${p.name} ${t("stockInItemAdded")}`);
     }
     setManualQuery("");
+  };
+
+  // 1-Tap Quick Sell Action (sells active item immediately & deducts inventory)
+  const handleQuickSellItem = (product: ProductItem, quantity: number) => {
+    if (quantity <= 0) return;
+
+    if (paymentMethod === PaymentMethod.STORE_CREDIT && !selectedCustomerId) {
+      showToast(t("selectCustomer"), "error");
+      return;
+    }
+
+    startTransition(async () => {
+      const saleTotal = quantity * product.sellingPrice;
+      const res = await checkoutSaleAction({
+        idempotencyKey: crypto.randomUUID(),
+        customerId: selectedCustomerId || null,
+        items: [
+          {
+            variantId: product.variantId,
+            quantity,
+            unitPrice: product.sellingPrice,
+            discount: 0,
+          },
+        ],
+        payments: [
+          {
+            paymentMethod,
+            amount: saleTotal,
+            tenderedAmount: saleTotal,
+            changeGiven: 0,
+          },
+        ],
+      });
+
+      if (!res.success) {
+        showToast(res.error || t("error"), "error");
+      } else {
+        playSuccessSound();
+        const remaining = Math.max(0, product.currentStock - quantity);
+        // Update in-memory catalog stock immediately
+        setCatalog((prev) =>
+          prev.map((p) =>
+            p.variantId === product.variantId ? { ...p, currentStock: remaining } : p
+          )
+        );
+        // Clear active scanned item
+        setActiveScannedItem(null);
+        // Remove from saleCart if it was staged there
+        setSaleCart((prev) => prev.filter((it) => it.product.variantId !== product.variantId));
+        setCompletedSale(res.sale);
+        showToast(
+          `${quantity}x ${product.name} ${language === "am" ? "ተሸጠ!" : "sold!"} (${t("stockRemaining")}: ${remaining})`,
+          "success"
+        );
+      }
+    });
+  };
+
+  // 1-Tap Quick Stock-In Action (adds stock to active item immediately)
+  const handleQuickStockInItem = (product: ProductItem, quantity: number) => {
+    if (quantity <= 0) return;
+
+    startTransition(async () => {
+      const res = await batchStockInAction({
+        items: [
+          {
+            variantId: product.variantId,
+            quantity,
+            costPrice: product.costPrice || 0,
+          },
+        ],
+        notes: `Quick Scan Stock In (${new Date().toLocaleDateString()})`,
+      });
+
+      if (!res.success) {
+        showToast(res.error || t("error"), "error");
+      } else {
+        playSuccessSound();
+        const newStock = product.currentStock + quantity;
+        setCatalog((prev) =>
+          prev.map((p) =>
+            p.variantId === product.variantId ? { ...p, currentStock: newStock } : p
+          )
+        );
+        setActiveScannedItem(null);
+        setReceivingList((prev) => prev.filter((it) => it.product.variantId !== product.variantId));
+        setCompletedStockIn(res.result);
+        showToast(
+          `+${quantity} ${product.name} ${language === "am" ? "ወደ ክምችት ተጨመረ!" : "added to stock!"} (${t("newStock")}: ${newStock})`,
+          "success"
+        );
+      }
+    });
+  };
+
+  // Handle In-Place Quick Registration of Uncataloged Scanned Item
+  const handleQuickRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = quickName.trim();
+    const cleanBarcode = quickBarcode.trim();
+
+    if (!cleanName || !cleanBarcode) {
+      showToast("Product name and barcode are required", "error");
+      return;
+    }
+
+    setIsRegistering(true);
+    try {
+      const chosenCategory =
+        quickCategory === "custom" ? quickCustomCategory.trim() || "General" : quickCategory;
+      const parsedSell = parseFloat(quickSellingPrice) || 0;
+      const parsedCost = parseFloat(quickCostPrice) || 0;
+      const parsedStock = parseInt(quickInitialStock) || 0;
+
+      const res = await quickRegisterProductAction({
+        barcode: cleanBarcode,
+        name: cleanName,
+        categoryName: chosenCategory,
+        sellingPrice: parsedSell,
+        costPrice: parsedCost,
+        initialStock: parsedStock,
+      });
+
+      if (!res.success) {
+        showToast(res.error || t("error"), "error");
+        setIsRegistering(false);
+        return;
+      }
+
+      // Add newly registered product into in-memory catalog
+      const newItem: ProductItem = res.item;
+      setCatalog((prev) => [newItem, ...prev]);
+      setNotFoundCode(null);
+      setIsQuickRegisterOpen(false);
+      playSuccessSound();
+      showToast(t("itemRegisteredAndStocked"), "success");
+
+      // Set as active scanned item so user can immediately sell it or adjust quantity!
+      setActiveScannedItem({ product: newItem, quantity: 1 });
+    } catch (err: any) {
+      showToast(err.message || "Failed to register", "error");
+    } finally {
+      setIsRegistering(false);
+    }
   };
 
   // Cart quantity adjustments
@@ -442,8 +634,8 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
   // Calculations for Stock In Staging List
   const totalReceivingUnits = receivingList.reduce((sum, it) => sum + it.quantity, 0);
 
-  // Filtered products for manual search
-  const filteredProducts = products.filter((p) => {
+  // Filtered products for manual search (filters against mutable catalog)
+  const filteredProducts = catalog.filter((p) => {
     if (!manualQuery.trim()) return false;
     const q = manualQuery.toLowerCase();
     return (
@@ -486,11 +678,18 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
       if (!result.success) {
         showToast(result.error || t("error"), "error");
       } else {
-        playBeep(1200);
-        // Update local stock balances
-        for (const item of saleCart) {
-          item.product.currentStock = Math.max(0, item.product.currentStock - item.quantity);
-        }
+        playSuccessSound();
+        // Update local catalog stock balances
+        setCatalog((prev) =>
+          prev.map((p) => {
+            const soldItem = saleCart.find((it) => it.product.variantId === p.variantId);
+            if (soldItem) {
+              return { ...p, currentStock: Math.max(0, p.currentStock - soldItem.quantity) };
+            }
+            return p;
+          })
+        );
+        setActiveScannedItem(null);
         setCompletedSale(result.sale);
         setSaleCart([]);
         setTenderedAmount("");
@@ -518,11 +717,18 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
       if (!result.success) {
         showToast(result.error || t("error"), "error");
       } else {
-        playBeep(1200);
-        // Update local stock balances
-        for (const it of receivingList) {
-          it.product.currentStock += it.quantity;
-        }
+        playSuccessSound();
+        // Update local catalog stock balances
+        setCatalog((prev) =>
+          prev.map((p) => {
+            const receivedItem = receivingList.find((it) => it.product.variantId === p.variantId);
+            if (receivedItem) {
+              return { ...p, currentStock: p.currentStock + receivedItem.quantity };
+            }
+            return p;
+          })
+        );
+        setActiveScannedItem(null);
         setCompletedStockIn(result.result);
         setReceivingList([]);
         setReceivingNotes("");
@@ -821,8 +1027,23 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
             {manualQuery.trim() && (
               <div className="max-h-80 overflow-y-auto space-y-2">
                 {filteredProducts.length === 0 ? (
-                  <div className="p-4 text-center text-xs text-slate-400 bg-slate-900/60 rounded-xl border border-slate-800">
-                    {t("emptyCart")}
+                  <div className="p-4 text-center text-xs text-slate-400 bg-slate-900/60 rounded-xl border border-slate-800 space-y-2.5">
+                    <p>{t("emptyCart")}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setQuickBarcode(manualQuery.trim());
+                        setQuickName("");
+                        setQuickSellingPrice("");
+                        setQuickCostPrice("");
+                        setQuickInitialStock(mode === "stock_in" ? "5" : "1");
+                        setIsQuickRegisterOpen(true);
+                      }}
+                      className="py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>{t("registerNewProduct")}: &quot;{manualQuery}&quot;</span>
+                    </button>
                   </div>
                 ) : (
                   filteredProducts.map((p) => (
@@ -875,21 +1096,282 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
             </div>
 
             <div className="flex gap-2 pt-1 border-t border-amber-800/40">
-              <Link
-                href={`/${shopSlug}/products?new=1&barcode=${encodeURIComponent(notFoundCode)}`}
-                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+              <button
+                type="button"
+                onClick={() => {
+                  setQuickBarcode(notFoundCode);
+                  setQuickName("");
+                  setQuickSellingPrice("");
+                  setQuickCostPrice("");
+                  setQuickInitialStock(mode === "stock_in" ? "5" : "1");
+                  setIsQuickRegisterOpen(true);
+                }}
+                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>{t("registerNewProduct")}</span>
-              </Link>
+              </button>
 
               <button
                 type="button"
                 onClick={() => setNotFoundCode(null)}
-                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold"
+                className="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold cursor-pointer"
               >
                 {t("close")}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ACTIVE SCANNED ITEM CARD (1-Tap Sell / Stock In / Stepper) */}
+        {activeScannedItem && (
+          <div
+            className={`p-4 rounded-2xl border shadow-2xl animate-in zoom-in-95 space-y-3 ${
+              mode === "sell"
+                ? "bg-slate-900/95 border-emerald-500/50 ring-1 ring-emerald-500/20"
+                : "bg-slate-900/95 border-blue-500/50 ring-1 ring-blue-500/20"
+            }`}
+          >
+            {/* Header: Title, Category & Close */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`h-2 w-2 rounded-full animate-ping ${
+                      mode === "sell" ? "bg-emerald-400" : "bg-blue-400"
+                    }`}
+                  />
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 font-mono">
+                    {t("scannedItem")}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold border border-slate-700">
+                    {activeScannedItem.product.category || "General"}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white truncate mt-1">
+                  {activeScannedItem.product.name}
+                </h3>
+                <p className="text-[11px] text-slate-400 font-mono">
+                  {activeScannedItem.product.barcode
+                    ? `Barcode: ${activeScannedItem.product.barcode}`
+                    : `SKU: ${activeScannedItem.product.sku}`}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setActiveScannedItem(null)}
+                className="h-7 w-7 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center shrink-0 cursor-pointer"
+                title={t("close")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Price & Stock Stats */}
+            <div className="grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  {t("unitPrice")}:
+                </span>
+                <div className="text-sm font-extrabold font-mono text-emerald-400">
+                  {formatCurrency(activeScannedItem.product.sellingPrice, shop.currency)}
+                </div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-semibold">
+                  {t("inStock")}:
+                </span>
+                <div
+                  className={`text-sm font-extrabold font-mono ${
+                    activeScannedItem.product.currentStock <= 0 ? "text-rose-400" : "text-slate-200"
+                  }`}
+                >
+                  {activeScannedItem.product.currentStock} {activeScannedItem.product.unit || t("unitPcs")}
+                </div>
+              </div>
+            </div>
+
+            {/* Quantity Stepper */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <label className="text-[11px] font-bold text-slate-300">
+                  {mode === "sell" ? t("quantity") : t("quantityReceived")}:
+                </label>
+                <span className="font-mono text-xs text-slate-400">
+                  {mode === "sell" && (
+                    <>
+                      {t("subtotal")}:{" "}
+                      <span className="font-bold text-emerald-400">
+                        {formatCurrency(
+                          activeScannedItem.quantity * activeScannedItem.product.sellingPrice,
+                          shop.currency
+                        )}
+                      </span>
+                    </>
+                  )}
+                  {mode === "stock_in" && (
+                    <>
+                      {t("newStock")}:{" "}
+                      <span className="font-bold text-blue-400">
+                        {activeScannedItem.product.currentStock + activeScannedItem.quantity}{" "}
+                        {activeScannedItem.product.unit || t("unitPcs")}
+                      </span>
+                    </>
+                  )}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveScannedItem((prev) =>
+                      prev && prev.quantity > 1 ? { ...prev, quantity: prev.quantity - 1 } : prev
+                    )
+                  }
+                  className="h-11 w-12 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white flex items-center justify-center font-bold text-lg border border-slate-700 cursor-pointer"
+                >
+                  <Minus className="h-5 w-5" />
+                </button>
+
+                <input
+                  type="number"
+                  min={1}
+                  value={activeScannedItem.quantity}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || 1;
+                    setActiveScannedItem((prev) =>
+                      prev ? { ...prev, quantity: Math.max(1, val) } : null
+                    );
+                  }}
+                  className="flex-1 h-11 bg-slate-950 border border-slate-700 rounded-xl text-center font-mono font-extrabold text-lg text-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setActiveScannedItem((prev) =>
+                      prev ? { ...prev, quantity: prev.quantity + 1 } : null
+                    )
+                  }
+                  className="h-11 w-12 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white flex items-center justify-center font-bold text-lg border border-slate-700 cursor-pointer"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Primary 1-Tap Action Button & Secondary Option */}
+            <div className="pt-1 space-y-2">
+              {mode === "sell" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleQuickSellItem(activeScannedItem.product, activeScannedItem.quantity)
+                    }
+                    disabled={isPending}
+                    className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold text-sm rounded-xl shadow-lg shadow-emerald-950 flex items-center justify-between cursor-pointer transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="h-4 w-4" />
+                      <span>
+                        {t("quickSellNowBtn")} ({activeScannedItem.quantity}x)
+                      </span>
+                    </span>
+                    <span className="font-mono text-sm font-bold">
+                      {formatCurrency(
+                        activeScannedItem.quantity * activeScannedItem.product.sellingPrice,
+                        shop.currency
+                      )}{" "}
+                      &rarr;
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaleCart((prev) => {
+                        const idx = prev.findIndex(
+                          (it) => it.product.variantId === activeScannedItem.product.variantId
+                        );
+                        if (idx >= 0) {
+                          const updated = [...prev];
+                          updated[idx].quantity += activeScannedItem.quantity;
+                          return updated;
+                        }
+                        return [
+                          ...prev,
+                          { product: activeScannedItem.product, quantity: activeScannedItem.quantity },
+                        ];
+                      });
+                      showToast(
+                        `+${activeScannedItem.quantity} ${activeScannedItem.product.name} ${t("itemsInCart")}`
+                      );
+                      setActiveScannedItem(null);
+                    }}
+                    className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>{t("addToCartAndScanMore")}</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleQuickStockInItem(activeScannedItem.product, activeScannedItem.quantity)
+                    }
+                    disabled={isPending}
+                    className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-500 active:scale-[0.99] disabled:opacity-50 text-white font-extrabold text-sm rounded-xl shadow-lg shadow-blue-950 flex items-center justify-between cursor-pointer transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <ArrowDownToLine className="h-4 w-4" />
+                      <span>
+                        {t("quickStockInNowBtn")} (+{activeScannedItem.quantity}{" "}
+                        {activeScannedItem.product.unit || t("unitPcs")})
+                      </span>
+                    </span>
+                    <span className="font-mono text-sm font-bold">
+                      {t("confirmStockInBtn")} &rarr;
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceivingList((prev) => {
+                        const idx = prev.findIndex(
+                          (it) => it.product.variantId === activeScannedItem.product.variantId
+                        );
+                        if (idx >= 0) {
+                          const updated = [...prev];
+                          updated[idx].quantity += activeScannedItem.quantity;
+                          return updated;
+                        }
+                        return [
+                          ...prev,
+                          {
+                            product: activeScannedItem.product,
+                            quantity: activeScannedItem.quantity,
+                            costPrice: activeScannedItem.product.costPrice || 0,
+                          },
+                        ];
+                      });
+                      showToast(
+                        `+${activeScannedItem.quantity} ${activeScannedItem.product.name} ${t("receivingList")}`
+                      );
+                      setActiveScannedItem(null);
+                    }}
+                    className="w-full py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
+                  >
+                    <Package className="h-3.5 w-3.5 text-blue-400" />
+                    <span>{t("addToReceivingList")}</span>
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1411,10 +1893,197 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
             <button
               type="button"
               onClick={() => setCompletedStockIn(null)}
-              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold"
+              className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold cursor-pointer"
             >
               {t("close")}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK REGISTER BOTTOM SHEET / MODAL */}
+      {isQuickRegisterOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end p-2 sm:p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 space-y-4 animate-in slide-in-from-bottom shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                  <Plus className="h-5 w-5 text-emerald-400" />
+                  <span>{t("quickRegisterProductTitle")}</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                  {t("quickRegisterProductDesc")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsQuickRegisterOpen(false)}
+                className="h-8 w-8 rounded-full bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center shrink-0 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleQuickRegisterSubmit} className="space-y-4">
+              {/* Scanned Barcode display */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">
+                    {t("barcode")}:
+                  </span>
+                  <div className="font-mono text-sm font-extrabold text-amber-300">
+                    {quickBarcode}
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded-full border border-emerald-800">
+                  {t("scannedItem")}
+                </span>
+              </div>
+
+              {/* Product Name (e.g. Book title) */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-200">
+                  {t("productName")} <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                  placeholder="e.g. Biology Grade 9 / ፊዚክስ 9ኛ ክፍል"
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Category Pills */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-200">
+                  {t("category")} / {language === "am" ? "የዕቃው አይነት" : "Type"}
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "Books", label: t("quickCategoryBooks"), icon: "📚" },
+                    { id: "Stationery", label: t("quickCategoryStationery"), icon: "✏️" },
+                    { id: "Groceries", label: t("quickCategoryGroceries"), icon: "🥫" },
+                    { id: "Electronics", label: t("quickCategoryElectronics"), icon: "🔌" },
+                    { id: "Clothing", label: t("quickCategoryClothing"), icon: "👕" },
+                    { id: "General", label: t("quickCategoryGeneral"), icon: "📦" },
+                  ].map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setQuickCategory(cat.id)}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                        quickCategory === cat.id
+                          ? "bg-blue-600 border-blue-400 text-white shadow-md shadow-blue-950"
+                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                      }`}
+                    >
+                      <span>{cat.icon}</span>
+                      <span className="truncate">{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pricing: Selling Price & Cost Price */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-200">
+                    {t("sellingPriceLabel")} ({shop.currency}) <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min={0}
+                    required
+                    inputMode="decimal"
+                    value={quickSellingPrice}
+                    onChange={(e) => setQuickSellingPrice(e.target.value)}
+                    placeholder="e.g. 350.00"
+                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-emerald-300 placeholder-slate-600 focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-200">
+                    {t("costPriceLabel")} ({shop.currency})
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    min={0}
+                    inputMode="decimal"
+                    value={quickCostPrice}
+                    onChange={(e) => setQuickCostPrice(e.target.value)}
+                    placeholder="e.g. 250.00"
+                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono text-slate-300 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Initial Stock Quantity */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-200">
+                  {t("initialStockLabel")} ({t("unitPcs")})
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    value={quickInitialStock}
+                    onChange={(e) => setQuickInitialStock(e.target.value)}
+                    placeholder="1"
+                    className="flex-1 px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm font-mono font-bold text-white focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
+                  />
+                  <div className="flex gap-1 shrink-0">
+                    {["1", "5", "10", "20"].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setQuickInitialStock(n)}
+                        className="px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono font-bold cursor-pointer"
+                      >
+                        +{n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsQuickRegisterOpen(false)}
+                  className="w-1/3 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs cursor-pointer"
+                >
+                  {t("cancel")}
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isRegistering || !quickName.trim() || !quickBarcode.trim()}
+                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] disabled:opacity-50 text-white rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950 cursor-pointer"
+                >
+                  {isRegistering ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4" />
+                  )}
+                  <span>
+                    {isRegistering
+                      ? t("loading")
+                      : language === "am"
+                      ? "መዝግብና ክምችት ላይ ጨምር"
+                      : "Save & Add to Inventory"}
+                  </span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
