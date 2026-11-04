@@ -2,6 +2,7 @@ import { prisma } from "../db";
 import { TenantContext } from "../tenant/context";
 import { Decimal, toDecimal } from "../decimal";
 import { SaleStatus, MovementType, POStatus, PlatformRole } from "@prisma/client";
+import { isTransportationCategory } from "./expense-service";
 
 export type DateRangePreset = "today" | "7d" | "30d" | "month" | "all";
 
@@ -127,10 +128,20 @@ export async function getShopOwnerDashboardMetrics(context: TenantContext, range
   const grossProfit = netSales.minus(totalCOGS);
 
   let totalExpenses = new Decimal(0);
+  let transportationCost = new Decimal(0);
+  let otherExpenses = new Decimal(0);
+
   expenses.forEach((e) => {
-    totalExpenses = totalExpenses.plus(toDecimal(e.amount));
+    const amt = toDecimal(e.amount);
+    totalExpenses = totalExpenses.plus(amt);
+    if (isTransportationCategory(e.category)) {
+      transportationCost = transportationCost.plus(amt);
+    } else {
+      otherExpenses = otherExpenses.plus(amt);
+    }
   });
 
+  const totalAcquisitionCost = totalCOGS.plus(transportationCost);
   const netProfit = grossProfit.minus(totalExpenses);
 
   const grossMarginPct = netSales.gt(0)
@@ -216,9 +227,12 @@ export async function getShopOwnerDashboardMetrics(context: TenantContext, range
       taxCollected: totalTax.toNumber(),
       discountsGiven: totalDiscount.toNumber(),
       cogs: totalCOGS.toNumber(),
+      transportationCost: transportationCost.toNumber(),
+      totalAcquisitionCost: totalAcquisitionCost.toNumber(),
       grossProfit: grossProfit.toNumber(),
       grossMarginPct,
-      operatingExpenses: totalExpenses.toNumber(),
+      operatingExpenses: otherExpenses.toNumber(),
+      totalExpenses: totalExpenses.toNumber(),
       netProfit: netProfit.toNumber(),
       netMarginPct,
       ordersCount: sales.length,
@@ -524,14 +538,30 @@ export async function getProfitLossReportData(context: TenantContext, range: Dat
 
   const expensesByCategory: Record<string, number> = {};
   let totalExpenses = new Decimal(0);
+  let transportationCost = new Decimal(0);
+  let operatingExpenses = new Decimal(0);
 
   expenses.forEach((e) => {
-    const cat = e.category;
+    const cat = e.category.trim();
     const amt = Number(e.amount);
     expensesByCategory[cat] = (expensesByCategory[cat] || 0) + amt;
-    totalExpenses = totalExpenses.plus(toDecimal(e.amount));
+    const decAmt = toDecimal(e.amount);
+    totalExpenses = totalExpenses.plus(decAmt);
+
+    if (isTransportationCategory(cat)) {
+      transportationCost = transportationCost.plus(decAmt);
+    } else {
+      operatingExpenses = operatingExpenses.plus(decAmt);
+    }
   });
 
+  // Treat transportation costs related to purchasing inventory as acquisition costs
+  const totalAcquisitionCost = cogs.plus(transportationCost);
+  const adjustedGrossProfit = netRevenue.minus(totalAcquisitionCost);
+
+  // Net Profit = Net Revenue - Total Acquisition Costs - Operating Overhead Expenses
+  // Note: totalAcquisitionCost + operatingExpenses = cogs + transportationCost + (totalExpenses - transportationCost) = cogs + totalExpenses.
+  // Transportation cost is seamlessly integrated and NEVER double-counted!
   const netProfit = grossProfit.minus(totalExpenses);
 
   return {
@@ -541,9 +571,13 @@ export async function getProfitLossReportData(context: TenantContext, range: Dat
     discounts: discounts.toNumber(),
     netRevenue: netRevenue.toNumber(),
     cogs: cogs.toNumber(),
+    transportationCost: transportationCost.toNumber(),
+    totalAcquisitionCost: totalAcquisitionCost.toNumber(),
     grossProfit: grossProfit.toNumber(),
+    adjustedGrossProfit: adjustedGrossProfit.toNumber(),
     grossMarginPercent: netRevenue.gt(0) ? grossProfit.div(netRevenue).mul(100).toDecimalPlaces(1).toNumber() : 0,
     expensesByCategory,
+    operatingExpenses: operatingExpenses.toNumber(),
     totalExpenses: totalExpenses.toNumber(),
     netProfit: netProfit.toNumber(),
     netMarginPercent: netRevenue.gt(0) ? netProfit.div(netRevenue).mul(100).toDecimalPlaces(1).toNumber() : 0,

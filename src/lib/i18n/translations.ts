@@ -291,6 +291,25 @@ export interface Translations {
   recordExpenseModalDesc: string;
   expenseDate: string;
   allCategories: string;
+  businessExpenses: string;
+  transportationCost: string;
+  customCategories: string;
+  addCategory: string;
+  editCategory: string;
+  deleteCategory: string;
+  manageCategories: string;
+  categoryName: string;
+  standardCategoryBadge: string;
+  standardCategoryNotice: string;
+  expenseNotes: string;
+  expenseNotesPlaceholder: string;
+  categoryPlaceholder: string;
+  newCategoryAddedSuccess: string;
+  categoryUpdatedSuccess: string;
+  categoryDeletedSuccess: string;
+  quickAddCategory: string;
+  transportationAcquisitionNote: string;
+  inventoryAcquisitionCosts: string;
 
   // Purchases additional
   allOrders: string;
@@ -580,12 +599,12 @@ export const translations: Record<Language, Translations> = {
     confirmRepayment: "Confirm Repayment",
 
     // Expenses
-    expensesTitle: "Daily Store Expenses",
+    expensesTitle: "Business Expenses",
     expensesSubtitle: "Track operational expenses, rent, utilities, and store costs",
     addExpenseBtn: "Record Expense",
     expenseAmount: "Expense Amount",
     expenseCategory: "Category",
-    expenseDescription: "Description / Notes",
+    expenseDescription: "Description",
     totalExpensesToday: "Expenses Today",
     totalExpensesMonth: "Expenses This Month",
 
@@ -665,10 +684,29 @@ export const translations: Record<Language, Translations> = {
     // Expenses additional
     expenseRecordsCount: "Expense Records Count",
     noExpensesFound: "No expense records found",
-    recordExpenseModalTitle: "Record Shop Expense",
-    recordExpenseModalDesc: "Track operating overhead and utility costs",
+    recordExpenseModalTitle: "Record Business Expense",
+    recordExpenseModalDesc: "Track operating overhead, transportation, and store costs",
     expenseDate: "Expense Date",
     allCategories: "All Categories",
+    businessExpenses: "Business Expenses",
+    transportationCost: "Transportation Cost",
+    customCategories: "Custom Categories",
+    addCategory: "Add Category",
+    editCategory: "Edit Category",
+    deleteCategory: "Delete Category",
+    manageCategories: "Manage Categories",
+    categoryName: "Category Name",
+    standardCategoryBadge: "Standard Category",
+    standardCategoryNotice: "Mandatory category always available to every business",
+    expenseNotes: "Optional Notes",
+    expenseNotesPlaceholder: "e.g. Paid via Telebirr, invoice #...",
+    categoryPlaceholder: "e.g. Rent, Electricity, Salaries, Delivery...",
+    newCategoryAddedSuccess: "Category added successfully",
+    categoryUpdatedSuccess: "Category updated successfully",
+    categoryDeletedSuccess: "Category deleted",
+    quickAddCategory: "+ New Category",
+    transportationAcquisitionNote: "Transportation costs related to purchasing inventory are treated as acquisition costs.",
+    inventoryAcquisitionCosts: "Inventory Acquisition Costs (COGS & Transportation)",
 
     // Purchases additional
     allOrders: "All Orders",
@@ -957,10 +995,10 @@ export const translations: Record<Language, Translations> = {
     confirmRepayment: "ክፍያውን መዝግብ",
 
     // Expenses
-    expensesTitle: "ዕለታዊ የሱቅ ወጪዎች",
-    expensesSubtitle: "የኪራይ፣ የመብራት፣ የትራንስፖርት እና ሌሎች የሱቅ ወጪዎችን ይቆጣጠሩ",
+    expensesTitle: "የንግድ ወጪዎች",
+    expensesSubtitle: "የትራንስፖርት፣ የኪራይ፣ የመብራትና ሌሎች የንግድ ወጪዎችን ይቆጣጠሩ",
     addExpenseBtn: "ወጪ መዝግብ",
-    expenseAmount: "የወጪው መጠን (ብር)",
+    expenseAmount: "የወጪ መጠን",
     expenseCategory: "የወጪው ምድብ",
     expenseDescription: "የወጪው ዝርዝር ማብራሪያ",
     totalExpensesToday: "የዛሬ ወጪዎች",
@@ -1042,10 +1080,29 @@ export const translations: Record<Language, Translations> = {
     // Expenses additional
     expenseRecordsCount: "የተመዘገቡ ወጪዎች ብዛት",
     noExpensesFound: "ምንም የወጪ መዝገብ አልተገኘም",
-    recordExpenseModalTitle: "የሱቅ ወጪ መዝግብ",
-    recordExpenseModalDesc: "የኪራይ፣ የሰራተኛ፣ የመብራትና የዕለት ተዕለት ወጪዎችን ይመዝግቡ",
+    recordExpenseModalTitle: "የንግድ ወጪ መዝግብ",
+    recordExpenseModalDesc: "የትራንስፖርት፣ የኪራይ፣ የሰራተኛና የሱቅ ወጪዎችን ይመዝግቡ",
     expenseDate: "የወጣበት ቀን",
     allCategories: "ሁሉም ምድቦች",
+    businessExpenses: "የንግድ ወጪዎች",
+    transportationCost: "የትራንስፖርት ወጪ",
+    customCategories: "ብጁ ምድቦች",
+    addCategory: "ምድብ ጨምር",
+    editCategory: "ምድብ አስተካክል",
+    deleteCategory: "ምድብ ሰርዝ",
+    manageCategories: "ምድቦች አስተዳድር",
+    categoryName: "የምድቡ ስም",
+    standardCategoryBadge: "መደበኛ ምድብ",
+    standardCategoryNotice: "ሁልጊዜ ለሁሉም ንግዶች የሚገኝ ቋሚ ምድብ",
+    expenseNotes: "ተጨማሪ ማስታወሻ (አስገዳጅ ያልሆነ)",
+    expenseNotesPlaceholder: "ለምሳሌ፦ በቴሌብር የተከፈለ፣ የደረሰኝ ቁጥር...",
+    categoryPlaceholder: "ለምሳሌ፦ ኪራይ፣ መብራት፣ ደመወዝ፣ ማድረሻ...",
+    newCategoryAddedSuccess: "የወጪ ምድብ በተሳካ ሁኔታ ተጨምሯል",
+    categoryUpdatedSuccess: "የምድቡ ስም በተሳካ ሁኔታ ተስተካክሏል",
+    categoryDeletedSuccess: "የወጪ ምድቡ ተሰርዟል",
+    quickAddCategory: "+ አዲስ ምድብ",
+    transportationAcquisitionNote: "ከዕቃ ግዢ ጋር የተያያዙ የትራንስፖርት ወጪዎች እንደ ዕቃ ማግኛ ወጪ ተቆጥረው በትርፍ ስሌት ውስጥ ይካተታሉ።",
+    inventoryAcquisitionCosts: "የዕቃዎች ማግኛና ግዢ ወጪዎች",
 
     // Purchases additional
     allOrders: "ሁሉም ትዕዛዞች",

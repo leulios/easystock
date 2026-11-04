@@ -124,20 +124,31 @@ export function ProfitLossClient({ data, period, shopSlug, currency }: ProfitLos
           </div>
         </div>
 
-        {/* 2. Cost of Goods Sold & Gross Profit */}
+        {/* 2. Cost of Goods Sold & Acquisition Costs */}
         <div>
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 pb-2 border-b border-slate-100">
-            {language === "am" ? "2. የዕቃዎች የግዢ ወጪ (COGS)" : "2. Cost of Goods Sold (COGS)"}
+            {language === "am" ? "2. የዕቃዎች ማግኛና ግዢ ወጪ (COGS & Acquisition)" : "2. Inventory Acquisition & Cost of Goods Sold"}
           </h2>
           <div className="divide-y divide-slate-100 text-sm">
             <div className="py-2.5 flex justify-between text-slate-600">
-              <span>{language === "am" ? "የተሸጡት ዕቃዎች የግዢ ዋጋ ድምር" : "Cost of Items Sold (Wholesale Inventory Deductions)"}</span>
+              <span>{language === "am" ? "የተሸጡት ዕቃዎች የግዢ ዋጋ (Wholesale COGS)" : "Wholesale Cost of Items Sold (COGS)"}</span>
               <span>-{formatCurrency(data.cogs, currency)}</span>
             </div>
+            {Number(data.transportationCost) > 0 && (
+              <div className="py-2.5 flex justify-between text-slate-600">
+                <span className="flex items-center gap-1.5">
+                  <span>{language === "am" ? "የትራንስፖርት ወጪ (የዕቃ ማግኛ)" : "Transportation Cost (Inventory Acquisition)"}</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">
+                    {language === "am" ? "የዕቃ ማግኛ" : "Acquisition"}
+                  </span>
+                </span>
+                <span>-{formatCurrency(data.transportationCost, currency)}</span>
+              </div>
+            )}
             <div className="py-2.5 flex justify-between font-bold text-emerald-600 bg-emerald-50/60 px-3 rounded-lg">
-              <span>{language === "am" ? "ጠቅላላ ትርፍ (ሽያጭ - የግዢ ወጪ)" : "Gross Profit (Net Sales - COGS)"}</span>
+              <span>{language === "am" ? "ጠቅላላ ትርፍ (ሽያጭ - የግዢና ማግኛ ወጪ)" : "Gross Profit (Net Sales - Acquisition & COGS)"}</span>
               <div className="text-right">
-                <span>{formatCurrency(data.grossProfit, currency)}</span>
+                <span>{formatCurrency(data.adjustedGrossProfit ?? data.grossProfit, currency)}</span>
                 <span className="text-xs font-medium text-emerald-700 ml-2">
                   ({data.grossMarginPercent}% {language === "am" ? "ማርጅን" : "margin"})
                 </span>
@@ -166,16 +177,26 @@ export function ProfitLossClient({ data, period, shopSlug, currency }: ProfitLos
                 {language === "am" ? "ለዚህ ጊዜ የተመዘገበ ወጪ የለም።" : "No operational expenses recorded for this period."}
               </div>
             ) : (
-              Object.entries(data.expensesByCategory).map(([cat, amt]) => (
-                <div key={cat} className="py-2 flex justify-between text-slate-600 text-xs">
-                  <span>{cat}</span>
-                  <span>{formatCurrency(amt as number, currency)}</span>
-                </div>
-              ))
+              Object.entries(data.expensesByCategory).map(([cat, amt]) => {
+                const isTrans = cat.toLowerCase().includes("transport") || cat.includes("ትራንስፖርት");
+                return (
+                  <div key={cat} className="py-2 flex justify-between text-slate-600 text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span>{cat}</span>
+                      {isTrans && (
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">
+                          {language === "am" ? "በዕቃ ማግኛ ውስጥ ተካቷል" : "factored in acquisition"}
+                        </span>
+                      )}
+                    </span>
+                    <span>{formatCurrency(amt as number, currency)}</span>
+                  </div>
+                );
+              })
             )}
             <div className="py-2.5 flex justify-between font-bold text-rose-600 bg-rose-50/40 px-3 rounded-lg">
-              <span>{language === "am" ? "ጠቅላላ የሥራ ማስኬጃ ወጪዎች" : "Total Operating Expenses"}</span>
-              <span>-{formatCurrency(data.totalExpenses, currency)}</span>
+              <span>{language === "am" ? "ጠቅላላ የሥራ ማስኬጃ ወጪዎች" : "Total Operating Overhead"}</span>
+              <span>-{formatCurrency(data.operatingExpenses ?? data.totalExpenses, currency)}</span>
             </div>
           </div>
         </div>

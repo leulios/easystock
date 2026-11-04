@@ -1,6 +1,6 @@
 import { getCurrentContext } from "@/app/actions/auth";
 import { redirect } from "next/navigation";
-import { listExpenses } from "@/lib/services/expense-service";
+import { listExpenses, getShopExpenseCategories } from "@/lib/services/expense-service";
 import { prisma } from "@/lib/db";
 import { ExpensesClient } from "./expenses-client";
 
@@ -16,8 +16,9 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
     redirect("/login");
   }
 
-  const [expensesResult, shop] = await Promise.all([
-    listExpenses(context, { pageSize: 100 }),
+  const [expensesResult, categoriesResult, shop] = await Promise.all([
+    listExpenses(context, { pageSize: 150 }),
+    getShopExpenseCategories(context),
     prisma.shop.findUnique({
       where: { id: context.shopId },
       select: { currency: true },
@@ -30,15 +31,17 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
     amount: Number(e.amount),
     expenseDate: e.expenseDate,
     description: e.description,
+    notes: e.notes,
     createdAt: e.createdAt,
   }));
 
   return (
     <ExpensesClient
       initialExpenses={items}
+      initialCategories={categoriesResult}
       totalAmount={expensesResult.totalExpenseAmount}
       shopSlug={shopSlug}
-      currency={shop?.currency || "USD"}
+      currency={shop?.currency || "ETB"}
     />
   );
 }
