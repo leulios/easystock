@@ -6,11 +6,17 @@ import {
   InviteStaffInput,
   updateStaffSchema,
   UpdateStaffInput,
+  resetStaffPasswordSchema,
+  ResetStaffPasswordInput,
+  toggleStaffStatusSchema,
+  ToggleStaffStatusInput,
 } from "@/lib/validations/staff";
 import {
   listShopStaff,
   addStaffMember,
   updateStaffMember,
+  resetStaffPassword,
+  toggleStaffStatus,
   removeStaffMember,
 } from "@/lib/services/staff-service";
 import { revalidatePath } from "next/cache";
@@ -87,6 +93,68 @@ export async function updateStaffAction(data: UpdateStaffInput) {
     return { success: true, member };
   } catch (err: any) {
     return { success: false, error: err.message || "Failed to update staff permissions" };
+  }
+}
+
+export async function resetStaffPasswordAction(data: ResetStaffPasswordInput): Promise<
+  | { success: true; email: string; fullName: string }
+  | { success: false; error: string; fieldErrors?: Record<string, string[]> }
+> {
+  const context = await getCurrentContext();
+  if (!context) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can reset staff passwords." };
+  }
+
+  const parsed = resetStaffPasswordSchema.safeParse(data);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Validation error",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  try {
+    const result = await resetStaffPassword(context, parsed.data);
+    revalidatePath(`/${context.shopId}/settings`);
+    return { success: true, email: result.email, fullName: result.fullName };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to reset staff password" };
+  }
+}
+
+export async function toggleStaffStatusAction(data: ToggleStaffStatusInput): Promise<
+  | { success: true; isActive: boolean }
+  | { success: false; error: string; fieldErrors?: Record<string, string[]> }
+> {
+  const context = await getCurrentContext();
+  if (!context) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can modify staff account status." };
+  }
+
+  const parsed = toggleStaffStatusSchema.safeParse(data);
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "Validation error",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  try {
+    const result = await toggleStaffStatus(context, parsed.data);
+    revalidatePath(`/${context.shopId}/settings`);
+    return { success: true, isActive: result.isActive };
+  } catch (err: any) {
+    return { success: false, error: err.message || "Failed to update staff status" };
   }
 }
 

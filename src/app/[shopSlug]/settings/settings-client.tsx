@@ -3,12 +3,14 @@
 import React, { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { updateShopSettingsAction } from "@/app/actions/shop";
-import { removeStaffAction } from "@/app/actions/staff";
+import { removeStaffAction, toggleStaffStatusAction } from "@/app/actions/staff";
 import { InviteStaffModal } from "./invite-staff-modal";
 import { EditStaffModal } from "./edit-staff-modal";
-import { useRouter } from "next/navigation";
+import { ResetStaffPasswordModal } from "./reset-staff-password-modal";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ShopRole } from "@prisma/client";
 import { useLanguage } from "@/lib/i18n/context";
+import { formatCurrency } from "@/lib/decimal";
 import {
   Settings,
   Building2,
@@ -23,6 +25,14 @@ import {
   Trash2,
   Edit2,
   Lock,
+  UserCheck,
+  UserX,
+  TrendingUp,
+  Clock,
+  Phone,
+  Power,
+  Copy,
+  Check,
 } from "lucide-react";
 
 interface StaffItem {
@@ -40,6 +50,9 @@ interface StaffItem {
   isOrgOwner: boolean;
   lastLoginAt: Date | null;
   createdAt: Date;
+  todaySalesCount?: number;
+  todaySalesTotal?: number;
+  totalSalesCount?: number;
 }
 
 interface SettingsClientProps {
@@ -74,8 +87,13 @@ export function SettingsClient({
   currentUserRole,
 }: SettingsClientProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { t, language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<"general" | "financial" | "receipt" | "staff">("general");
+
+  const tabParam = searchParams?.get("tab");
+  const [activeTab, setActiveTab] = useState<"general" | "financial" | "receipt" | "staff">(
+    tabParam === "staff" ? "staff" : "general"
+  );
 
   // Shop settings form state
   const [name, setName] = useState(initialShop.name);
@@ -96,8 +114,36 @@ export function SettingsClient({
   // Staff modals
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffItem | null>(null);
+  const [resettingStaffPassword, setResettingStaffPassword] = useState<StaffItem | null>(null);
+  const [copiedStaffId, setCopiedStaffId] = useState<string | null>(null);
 
   const isOwner = currentUserRole === ShopRole.SHOP_OWNER;
+
+  const handleCopyUsername = (staff: StaffItem) => {
+    navigator.clipboard.writeText(staff.email);
+    setCopiedStaffId(staff.id);
+    setTimeout(() => setCopiedStaffId(null), 2000);
+  };
+
+  const handleToggleStaffStatus = async (staff: StaffItem) => {
+    const actionWord = staff.isActive
+      ? (language === "am" ? "ማገድ" : "suspend")
+      : (language === "am" ? "ማንቃት" : "activate");
+    const confirmPrompt = language === "am"
+      ? `እርግጠኛ ነዎት የ ${staff.fullName} አካውንት ${actionWord} ይፈልጋሉ?`
+      : `Are you sure you want to ${actionWord} the account for ${staff.fullName}?`;
+    if (!confirm(confirmPrompt)) return;
+
+    const res = await toggleStaffStatusAction({
+      membershipId: staff.id,
+      isActive: !staff.isActive,
+    });
+    if (res.success) {
+      router.refresh();
+    } else {
+      alert(res.error || (language === "am" ? "የአካውንት ሁኔታን መቀየር አልተቻለም" : "Failed to update staff status"));
+    }
+  };
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -448,12 +494,12 @@ export function SettingsClient({
 
       {/* TAB 4: Staff & Access Control */}
       {activeTab === "staff" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-slate-900">{t("staffManagement")}</h2>
+              <h2 className="text-base font-bold text-slate-900">{t("staffMonitoring")}</h2>
               <p className="text-xs text-slate-500">
-                {language === "am" ? "የሰራተኛ አካውንት ይፍጠሩ፣ ሚስጥር ቁጥር (PIN) ይመድቡ እና ፈቃዶችን ያስተዳድሩ" : "Manage cashier accounts, configure role permissions, and assign quick POS PINs"}
+                {t("staffMonitoringSubtitle")}
               </p>
             </div>
 
@@ -467,15 +513,74 @@ export function SettingsClient({
             )}
           </div>
 
+          {/* Monitoring KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  {language === "am" ? "ጠቅላላ ሰራተኞች" : "Team Accounts"}
+                </span>
+                <div className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                  {initialStaff.length}
+                </div>
+                <span className="text-[11px] text-emerald-600 font-medium">
+                  {initialStaff.filter((s) => s.isActive).length} {t("statusActive")}
+                </span>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <Users className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  {t("todaySalesCount")}
+                </span>
+                <div className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                  {initialStaff.reduce((sum, s) => sum + (s.todaySalesCount || 0), 0)}
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {language === "am" ? "በሁሉም ሰራተኞች የተመዘገበ" : "Processed by shop team"}
+                </span>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                  {t("todaySalesVolume")}
+                </span>
+                <div className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                  {formatCurrency(
+                    initialStaff.reduce((sum, s) => sum + (s.todaySalesTotal || 0), 0),
+                    initialShop.currency
+                  )}
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {language === "am" ? "የዛሬ የፈረቃ ገቢ" : "Current shift sales total"}
+                </span>
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Receipt className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 text-slate-700 uppercase tracking-wider font-semibold border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-4">{t("fullNameLabel")} & {t("emailLabel")}</th>
+                    <th className="py-3 px-4">{t("fullNameLabel")} & {t("usernameLabel")}</th>
                     <th className="py-3 px-4">{t("staffRole")}</th>
+                    <th className="py-3 px-4 text-center">{t("accountStatus")}</th>
+                    <th className="py-3 px-4">{t("todaySalesCount")}</th>
+                    <th className="py-3 px-4">{t("lastActiveLabel")}</th>
                     <th className="py-3 px-4 text-center">{t("posPinLabel")}</th>
-                    <th className="py-3 px-4">{language === "am" ? "የተፈቀዱ ተግባራት" : "Operational Privileges"}</th>
                     <th className="py-3 px-4 text-right">{t("actions")}</th>
                   </tr>
                 </thead>
@@ -483,8 +588,34 @@ export function SettingsClient({
                   {initialStaff.map((s) => (
                     <tr key={s.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-slate-900 text-sm">{s.fullName}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">{s.email}</div>
+                        <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                          {s.fullName}
+                          {s.isOrgOwner && (
+                            <span className="text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.2 rounded">
+                              {language === "am" ? "ዋና ባለቤት" : "Owner"}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyUsername(s)}
+                            title={language === "am" ? "የተጠቃሚ ስም ቅዳ" : "Copy Login Username"}
+                            className="inline-flex items-center gap-1 font-mono text-[11px] text-slate-600 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded border border-slate-200 transition-colors"
+                          >
+                            {copiedStaffId === s.id ? (
+                              <Check className="h-3 w-3 text-emerald-600" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-slate-400" />
+                            )}
+                            <span>{s.email}</span>
+                          </button>
+                          {s.phone && (
+                            <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                              <Phone className="h-2.5 w-2.5" /> {s.phone}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -506,6 +637,53 @@ export function SettingsClient({
                       </td>
 
                       <td className="py-3.5 px-4 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            s.isActive
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          }`}
+                        >
+                          {s.isActive ? (
+                            <>
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              {t("statusActive")}
+                            </>
+                          ) : (
+                            <>
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              {t("statusSuspended")}
+                            </>
+                          )}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        <div className="font-semibold text-slate-900">
+                          {s.todaySalesCount || 0} {language === "am" ? "ሽያጭ" : "sales"}
+                          {s.todaySalesTotal ? ` (${formatCurrency(s.todaySalesTotal, initialShop.currency)})` : ""}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {s.totalSalesCount || 0} {language === "am" ? "ጠቅላላ ሽያጮች" : "lifetime sales"}
+                        </div>
+                      </td>
+
+                      <td className="py-3.5 px-4">
+                        {s.lastLoginAt ? (
+                          <div className="text-slate-700 text-[11px]">
+                            {new Date(s.lastLoginAt).toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[11px] italic">{t("neverActive")}</span>
+                        )}
+                      </td>
+
+                      <td className="py-3.5 px-4 text-center">
                         {s.hasPin ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                             <KeyRound className="h-3 w-3" /> {language === "am" ? "ተመድቧል" : "Set"}
@@ -515,32 +693,19 @@ export function SettingsClient({
                         )}
                       </td>
 
-                      <td className="py-3.5 px-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {s.canViewReports && (
-                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              {language === "am" ? "ሪፖርቶች" : "Reports"}
-                            </span>
-                          )}
-                          {s.canApplyDiscount && (
-                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              {language === "am" ? "ቅናሽ" : "Discounts"}
-                            </span>
-                          )}
-                          {s.canAdjustStock && (
-                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px] font-medium">
-                              {language === "am" ? "ክምችት ማስተካከል" : "Stock Adjust"}
-                            </span>
-                          )}
-                          {!s.canViewReports && !s.canApplyDiscount && !s.canAdjustStock && (
-                            <span className="text-slate-400 text-[10px]">{language === "am" ? "መደበኛ መሸጫ ብቻ" : "Standard POS only"}</span>
-                          )}
-                        </div>
-                      </td>
-
                       <td className="py-3.5 px-4 text-right">
                         {isOwner && (
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Reset / Change Password Button */}
+                            <button
+                              onClick={() => setResettingStaffPassword(s)}
+                              title={t("changeStaffPasswordBtn")}
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 hover:text-amber-700 transition-colors"
+                            >
+                              <KeyRound className="h-4 w-4" />
+                            </button>
+
+                            {/* Edit Permissions Button */}
                             <button
                               onClick={() => setEditingStaff(s)}
                               title={language === "am" ? "ፈቃዶችንና ፒን አስተካክል" : "Edit Permissions & PIN"}
@@ -548,6 +713,23 @@ export function SettingsClient({
                             >
                               <Edit2 className="h-4 w-4" />
                             </button>
+
+                            {/* Suspend / Activate Toggle */}
+                            {!s.isOrgOwner && (
+                              <button
+                                onClick={() => handleToggleStaffStatus(s)}
+                                title={s.isActive ? t("suspendAccountBtn") : t("activateAccountBtn")}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  s.isActive
+                                    ? "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+                                    : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                }`}
+                              >
+                                <Power className="h-4 w-4" />
+                              </button>
+                            )}
+
+                            {/* Remove Staff Button */}
                             {!s.isOrgOwner && (
                               <button
                                 onClick={() => handleRemoveStaff(s.id, s.fullName)}
@@ -582,6 +764,15 @@ export function SettingsClient({
           onClose={() => setEditingStaff(null)}
           onSuccess={() => router.refresh()}
           staff={editingStaff}
+        />
+      )}
+
+      {resettingStaffPassword && (
+        <ResetStaffPasswordModal
+          isOpen={true}
+          onClose={() => setResettingStaffPassword(null)}
+          onSuccess={() => router.refresh()}
+          staff={resettingStaffPassword}
         />
       )}
     </div>

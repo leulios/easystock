@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Scan,
   History,
+  UserCheck,
 } from "lucide-react";
 import { ShopRole } from "@prisma/client";
 import { useLanguage } from "@/lib/i18n/context";
@@ -116,6 +117,12 @@ export function MobileBottomNav({ shopId, role, isPlatformAdmin }: MobileBottomN
       href: `/${shopId}/reports`,
       icon: BarChart3,
       roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
+    },
+    {
+      name: t("navStaffManagement"),
+      href: `/${shopId}/settings?tab=staff`,
+      icon: UserCheck,
+      roles: [ShopRole.SHOP_OWNER],
     },
     {
       name: t("navSettings"),

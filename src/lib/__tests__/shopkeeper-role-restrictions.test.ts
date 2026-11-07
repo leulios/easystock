@@ -644,7 +644,7 @@ describe("Shopkeeper Role Restrictions & Sales-Only Enforcement", () => {
       createExpense(shopkeeperContext, {
         category: "Transportation Cost",
         amount: 350,
-        expenseDate: new Date(),
+        expenseDate: new Date().toISOString(),
         description: "Delivery fuel",
       })
     ).rejects.toThrow(/Unauthorized/i);
@@ -751,7 +751,7 @@ describe("Shopkeeper Role Restrictions & Sales-Only Enforcement", () => {
     const exp = await createExpense(ownerContext, {
       category: "Transportation Cost",
       amount: 400,
-      expenseDate: new Date(),
+      expenseDate: new Date().toISOString(),
       description: "Freight delivery to store",
     });
     expect(Number(exp.amount)).toBe(400);

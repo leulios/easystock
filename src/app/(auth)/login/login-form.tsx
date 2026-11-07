@@ -14,7 +14,7 @@ interface LoginFormProps {
 
 export function LoginForm({ redirectUrl }: LoginFormProps) {
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isPending, startTransition] = useTransition();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -52,12 +52,12 @@ export function LoginForm({ redirectUrl }: LoginFormProps) {
       )}
 
       <Input
-        label={t("emailLabel")}
+        label={t("usernameOrEmailLabel")}
         name="email"
-        type="email"
-        autoComplete="email"
+        type="text"
+        autoComplete="username"
         required
-        placeholder="you@company.com"
+        placeholder={language === "am" ? "የተጠቃሚ ስም ወይም ኢሜይል" : "username or email"}
         error={fieldErrors.email?.[0]}
       />
 

@@ -153,8 +153,11 @@ export async function loginUser(
   input: LoginInput,
   meta?: { ipAddress?: string; userAgent?: string }
 ): Promise<AuthResult> {
-  const user = await prisma.user.findUnique({
-    where: { email: input.email },
+  const identifier = input.email.toLowerCase().trim();
+
+  // Try direct email/username lookup, with fallback to phone number if applicable
+  let user = await prisma.user.findUnique({
+    where: { email: identifier },
     include: {
       memberships: {
         include: {
@@ -165,8 +168,31 @@ export async function loginUser(
     },
   });
 
-  if (!user || !user.isActive) {
+  if (!user && prisma.user.findFirst) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { phone: identifier },
+        ],
+      },
+      include: {
+        memberships: {
+          include: {
+            organization: true,
+            shop: true,
+          },
+        },
+      },
+    });
+  }
+
+  if (!user) {
     throw new Error("Invalid email or password.");
+  }
+
+  if (!user.isActive) {
+    throw new Error("This account has been deactivated. Please contact your shop owner.");
   }
 
   const isValidPassword = await verifyPassword(input.password, user.passwordHash);

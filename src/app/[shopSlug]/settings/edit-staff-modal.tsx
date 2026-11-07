@@ -15,6 +15,7 @@ interface EditStaffModalProps {
     id: string;
     fullName: string;
     email: string;
+    phone?: string | null;
     role: ShopRole;
     hasPin: boolean;
     canViewReports: boolean;
@@ -26,6 +27,8 @@ interface EditStaffModalProps {
 
 export function EditStaffModal({ isOpen, onClose, onSuccess, staff }: EditStaffModalProps) {
   const { t, language } = useLanguage();
+  const [fullName, setFullName] = useState(staff.fullName);
+  const [phone, setPhone] = useState(staff.phone || "");
   const [role, setRole] = useState<ShopRole>(staff.role);
   const [pin, setPin] = useState("");
   const [canViewReports, setCanViewReports] = useState(staff.canViewReports);
@@ -49,6 +52,8 @@ export function EditStaffModal({ isOpen, onClose, onSuccess, staff }: EditStaffM
     startTransition(async () => {
       const result = await updateStaffAction({
         membershipId: staff.id,
+        fullName: fullName.trim(),
+        phone: phone.trim() || undefined,
         role,
         pin: pin.trim() || undefined,
         canViewReports,
@@ -95,6 +100,32 @@ export function EditStaffModal({ isOpen, onClose, onSuccess, staff }: EditStaffM
               <span>{error}</span>
             </div>
           )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">{t("fullNameLabel")} *</label>
+              <input
+                type="text"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full h-10 px-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 font-medium"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">
+                {language === "am" ? "ስልክ ቁጥር" : "Phone Number"}
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+251 91 123 4567"
+                className="w-full h-10 px-3 text-sm bg-slate-50 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
+              />
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">

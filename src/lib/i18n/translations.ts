@@ -383,6 +383,34 @@ export interface Translations {
   savePermissionsBtn: string;
   sendInviteBtn: string;
 
+  // Staff Management, Mentoring & Credentials
+  navStaffManagement: string;
+  usernameLabel: string;
+  usernameOrEmailLabel: string;
+  staffPasswordLabel: string;
+  staffPasswordPlaceholder: string;
+  changeStaffPasswordBtn: string;
+  resetPasswordModalTitle: string;
+  resetPasswordModalDesc: string;
+  newPasswordLabel: string;
+  passwordChangedSuccess: string;
+  accountStatus: string;
+  statusActive: string;
+  statusSuspended: string;
+  suspendAccountBtn: string;
+  activateAccountBtn: string;
+  staffMonitoring: string;
+  staffMonitoringSubtitle: string;
+  todaySalesCount: string;
+  todaySalesVolume: string;
+  totalSalesCount: string;
+  lastActiveLabel: string;
+  neverActive: string;
+  credentialsCardTitle: string;
+  credentialsCardDesc: string;
+  copyCredentialsBtn: string;
+  credentialsCopied: string;
+
   // Dashboard, Ledger & Misc
   activeCashierShift: string;
   welcomeTerminal: string;
@@ -788,6 +816,34 @@ export const translations: Record<Language, Translations> = {
     savePermissionsBtn: "Save Permissions",
     sendInviteBtn: "Add Team Member",
 
+    // Staff Management, Mentoring & Credentials
+    navStaffManagement: "Team & Staff Accounts",
+    usernameLabel: "Username",
+    usernameOrEmailLabel: "Username or Email",
+    staffPasswordLabel: "Login Password",
+    staffPasswordPlaceholder: "Set password for this account",
+    changeStaffPasswordBtn: "Change Password",
+    resetPasswordModalTitle: "Change Staff Password",
+    resetPasswordModalDesc: "Set a new login password for this shopkeeper or manager to use.",
+    newPasswordLabel: "New Password",
+    passwordChangedSuccess: "Password updated successfully! Share the new credentials with the staff member.",
+    accountStatus: "Status",
+    statusActive: "Active",
+    statusSuspended: "Suspended",
+    suspendAccountBtn: "Suspend",
+    activateAccountBtn: "Activate",
+    staffMonitoring: "Staff Oversight & Monitoring",
+    staffMonitoringSubtitle: "Manage accounts, set login credentials, and monitor sales performance for all staff in your shop.",
+    todaySalesCount: "Today's Sales",
+    todaySalesVolume: "Today's Volume",
+    totalSalesCount: "Total Sales",
+    lastActiveLabel: "Last Active",
+    neverActive: "Never logged in",
+    credentialsCardTitle: "Account Created Successfully",
+    credentialsCardDesc: "Give these login details to your shopkeeper so they can log in:",
+    copyCredentialsBtn: "Copy Login Details",
+    credentialsCopied: "Credentials copied to clipboard!",
+
     // Dashboard, Ledger & Misc
     activeCashierShift: "Active Cashier Shift",
     welcomeTerminal: "Welcome to",
@@ -1191,6 +1247,34 @@ export const translations: Record<Language, Translations> = {
     canAdjustStockLabel: "ክምችት የማስተካከል ፈቃድ",
     savePermissionsBtn: "ፈቃዶችን አስቀምጥ",
     sendInviteBtn: "ሰራተኛውን መዝግብ",
+
+    // Staff Management, Mentoring & Credentials
+    navStaffManagement: "የሰራተኞች አካውንትና ክትትል",
+    usernameLabel: "የተጠቃሚ ስም",
+    usernameOrEmailLabel: "የተጠቃሚ ስም ወይም ኢሜይል",
+    staffPasswordLabel: "የመግቢያ የይለፍ ቃል",
+    staffPasswordPlaceholder: "ለዚህ አካውንት የይለፍ ቃል ያስገቡ",
+    changeStaffPasswordBtn: "የይለፍ ቃል ቀይር",
+    resetPasswordModalTitle: "የሰራተኛ የይለፍ ቃል ቀይር",
+    resetPasswordModalDesc: "ይህ የሽያጭ ሰራተኛ ወይም ስራ አስኪያጅ የሚጠቀምበትን አዲስ የመግቢያ የይለፍ ቃል ያስገቡ።",
+    newPasswordLabel: "አዲስ የይለፍ ቃል",
+    passwordChangedSuccess: "የይለፍ ቃሉ በተሳካ ሁኔታ ተቀይሯል! አዲሱን መረጃ ለሰራተኛው ያጋሩ።",
+    accountStatus: "ሁኔታ",
+    statusActive: "ንቁ",
+    statusSuspended: "የታገደ",
+    suspendAccountBtn: "አግድ",
+    activateAccountBtn: "አንቃ",
+    staffMonitoring: "የሰራተኞች ቁጥጥርና ክትትል",
+    staffMonitoringSubtitle: "የሰራተኞችን አካውንት ያስተዳድሩ፣ የመግቢያ መረጃ ይመድቡ፣ እና የሽያጭ አፈጻጸማቸውን ይከታተሉ።",
+    todaySalesCount: "የዛሬ ሽያጮች",
+    todaySalesVolume: "የዛሬ ገቢ",
+    totalSalesCount: "ጠቅላላ ሽያጭ",
+    lastActiveLabel: "የመጨረሻ እንቅስቃሴ",
+    neverActive: "እስካሁን አልገባም",
+    credentialsCardTitle: "አካውንቱ በተሳካ ሁኔታ ተፈጥሯል",
+    credentialsCardDesc: "ሰራተኛው ወደ ሲስተሙ እንዲገባ እነዚህን የመግቢያ መረጃዎች ይስጡት፦",
+    copyCredentialsBtn: "የመግቢያ መረጃውን ቅዳ",
+    credentialsCopied: "መረጃው ተቀድቷል!",
 
     // Dashboard, Ledger & Misc
     activeCashierShift: "የሽያጭ ሰራተኛ ፈረቃ",
