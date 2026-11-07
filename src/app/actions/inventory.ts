@@ -12,11 +12,19 @@ import {
   BatchStockInInput,
 } from "@/lib/services/inventory-service";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export async function adjustStockAction(data: StockAdjustmentInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Shopkeepers cannot adjust inventory quantities. Stock control is reserved for Shop Owners.",
+    };
   }
 
   const parsed = stockAdjustmentSchema.safeParse(data);
@@ -46,6 +54,13 @@ export async function getStockMovementsAction(options: ListMovementsOptions = {}
     return { success: false, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Shopkeepers cannot view stock movements or inventory ledgers.",
+    };
+  }
+
   try {
     const result = await listStockMovements(context, options);
     return { success: true, ...result };
@@ -58,6 +73,13 @@ export async function transferStockAction(data: TransferStockInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false as const, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot transfer stock between shops.",
+    };
   }
 
   if (!data.targetShopId || !data.variantId || !data.quantity || data.quantity <= 0) {
@@ -79,6 +101,13 @@ export async function batchStockInAction(data: BatchStockInInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false as const, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot receive stock. Stock receiving is reserved for Shop Owners.",
+    };
   }
 
   try {

@@ -4,6 +4,7 @@ import { getCurrentContext } from "./auth";
 import { updateShopSettingsSchema, UpdateShopSettingsInput } from "@/lib/validations/shop-settings";
 import { getShopSettings, updateShopSettings } from "@/lib/services/shop-service";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export async function getShopSettingsAction() {
   const context = await getCurrentContext();
@@ -23,6 +24,10 @@ export async function updateShopSettingsAction(data: UpdateShopSettingsInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role !== ShopRole.SHOP_OWNER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can modify shop settings." };
   }
 
   const parsed = updateShopSettingsSchema.safeParse(data);

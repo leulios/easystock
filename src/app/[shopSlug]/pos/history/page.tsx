@@ -30,6 +30,7 @@ export default async function HistoryPage({ params }: HistoryPageProps) {
       shopSlug={shopSlug}
       shopName={shop?.name || "Shop"}
       currency={shop?.currency || "USD"}
+      userRole={context.role}
     />
   );
 }

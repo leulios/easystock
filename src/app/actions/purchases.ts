@@ -17,11 +17,16 @@ import {
   listPurchaseOrders,
 } from "@/lib/services/purchase-service";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export async function createSupplierAction(data: SupplierInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Shopkeepers cannot manage suppliers." };
   }
 
   const parsed = supplierSchema.safeParse(data);
@@ -48,6 +53,10 @@ export async function getSuppliersAction() {
     return { success: false, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Shopkeepers cannot view suppliers." };
+  }
+
   try {
     const suppliers = await listSuppliers(context);
     return { success: true, suppliers };
@@ -60,6 +69,10 @@ export async function createPurchaseOrderAction(data: PurchaseOrderInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Shopkeepers cannot create purchase orders." };
   }
 
   const parsed = purchaseOrderSchema.safeParse(data);
@@ -86,6 +99,10 @@ export async function receivePurchaseStockAction(data: ReceivePurchaseInput) {
     return { success: false, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Shopkeepers cannot receive stock." };
+  }
+
   const parsed = receivePurchaseSchema.safeParse(data);
   if (!parsed.success) {
     return {
@@ -110,6 +127,10 @@ export async function getPurchaseOrdersAction(options: { status?: any; page?: nu
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Shopkeepers cannot view purchase orders." };
   }
 
   try {

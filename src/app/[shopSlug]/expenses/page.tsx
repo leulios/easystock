@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listExpenses, getShopExpenseCategories } from "@/lib/services/expense-service";
 import { prisma } from "@/lib/db";
 import { ExpensesClient } from "./expenses-client";
+import { ShopRole } from "@prisma/client";
 
 interface ExpensesPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -14,6 +15,10 @@ export default async function ExpensesPage({ params }: ExpensesPageProps) {
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   const [expensesResult, categoriesResult, shop] = await Promise.all([

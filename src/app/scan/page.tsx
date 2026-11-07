@@ -60,6 +60,7 @@ export default async function DedicatedRootScanPage() {
         currency: shop.currency,
       }}
       shopSlug={shop.code || shop.id}
+      userRole={context.role}
     />
   );
 }

@@ -16,11 +16,19 @@ import {
   deleteCustomExpenseCategory,
 } from "@/lib/services/expense-service";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export async function createExpenseAction(data: ExpenseInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false as const, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot record expenses. Expense management is reserved for Shop Owners.",
+    };
   }
 
   const parsed = expenseSchema.safeParse(data);
@@ -50,6 +58,13 @@ export async function getExpensesAction(options: any = {}) {
     return { success: false as const, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot view business expenses.",
+    };
+  }
+
   try {
     const result = await listExpenses(context, options);
     return { success: true as const, ...result };
@@ -64,6 +79,13 @@ export async function getExpenseCategoriesAction() {
     return { success: false as const, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot view expense categories.",
+    };
+  }
+
   try {
     const categories = await getShopExpenseCategories(context);
     return { success: true as const, categories };
@@ -76,6 +98,13 @@ export async function addExpenseCategoryAction(name: string) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false as const, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot add expense categories.",
+    };
   }
 
   const parsed = customCategoryInputSchema.safeParse({ name });
@@ -102,6 +131,13 @@ export async function updateExpenseCategoryAction(id: string, newName: string) {
     return { success: false as const, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot update expense categories.",
+    };
+  }
+
   const parsed = updateCustomCategoryInputSchema.safeParse({ id, name: newName });
   if (!parsed.success) {
     return {
@@ -124,6 +160,13 @@ export async function deleteExpenseCategoryAction(id: string) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false as const, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot delete expense categories.",
+    };
   }
 
   try {

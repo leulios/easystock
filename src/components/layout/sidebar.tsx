@@ -15,6 +15,7 @@ import {
   Settings,
   Shield,
   Smartphone,
+  History,
 } from "lucide-react";
 import { ShopRole } from "@prisma/client";
 import { useLanguage } from "@/lib/i18n/context";
@@ -53,10 +54,16 @@ export function Sidebar({ shopId, role, isPlatformAdmin }: SidebarProps) {
       badge: language === "am" ? "በስልክ" : "Mobile",
     },
     {
+      name: role === ShopRole.SHOPKEEPER ? t("navMySalesHistory") : t("navSalesHistory"),
+      href: `/${shopId}/pos/history`,
+      icon: History,
+      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
+    },
+    {
       name: t("navStock"),
       href: `/${shopId}/inventory`,
       icon: Boxes,
-      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
+      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
       name: t("navItems"),
@@ -74,7 +81,7 @@ export function Sidebar({ shopId, role, isPlatformAdmin }: SidebarProps) {
       name: t("navCustomers"),
       href: `/${shopId}/customers`,
       icon: Users,
-      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
+      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
       name: t("navExpenses"),

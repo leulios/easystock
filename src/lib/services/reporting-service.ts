@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { TenantContext } from "../tenant/context";
+import { TenantContext, assertCanViewReports } from "../tenant/context";
 import { Decimal, toDecimal } from "../decimal";
 import { SaleStatus, MovementType, POStatus, PlatformRole } from "@prisma/client";
 import { isTransportationCategory } from "./expense-service";
@@ -33,6 +33,7 @@ export function resolveDateRange(preset: DateRangePreset): { startDate?: Date; e
 // 1. SHOP OWNER DASHBOARD METRICS
 // -----------------------------------------------------------------------------
 export async function getShopOwnerDashboardMetrics(context: TenantContext, range: DateRangePreset = "30d") {
+  assertCanViewReports(context, "Owner dashboard metrics");
   const { organizationId, shopId } = context;
   const { startDate, endDate } = resolveDateRange(range);
 
@@ -432,6 +433,7 @@ export async function getPlatformAdminMetrics(context: TenantContext) {
 // 4. DETAILED REPORTING DATA GENERATORS (FOR TABLES & CSV EXPORT)
 // -----------------------------------------------------------------------------
 export async function getSalesReportData(context: TenantContext, range: DateRangePreset = "30d") {
+  assertCanViewReports(context, "Sales report");
   const { shopId } = context;
   const { startDate, endDate } = resolveDateRange(range);
 
@@ -464,6 +466,7 @@ export async function getSalesReportData(context: TenantContext, range: DateRang
 }
 
 export async function getInventoryValuationReportData(context: TenantContext) {
+  assertCanViewReports(context, "Inventory valuation report");
   const { shopId } = context;
 
   const items = await prisma.inventoryItem.findMany({
@@ -500,6 +503,7 @@ export async function getInventoryValuationReportData(context: TenantContext) {
 }
 
 export async function getProfitLossReportData(context: TenantContext, range: DateRangePreset = "month") {
+  assertCanViewReports(context, "Profit & loss report");
   const { shopId } = context;
   const { startDate, endDate } = resolveDateRange(range);
 

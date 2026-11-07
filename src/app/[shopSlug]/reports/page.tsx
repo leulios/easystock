@@ -15,6 +15,10 @@ export default async function ReportsPage({ params }: ReportsPageProps) {
     redirect("/login");
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
+  }
+
   // Ensure caller has reporting permissions
   const canViewReports =
     context.role === ShopRole.SHOP_OWNER ||

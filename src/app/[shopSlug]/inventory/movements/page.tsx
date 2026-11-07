@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listStockMovements } from "@/lib/services/inventory-service";
 import { prisma } from "@/lib/db";
 import { MovementsClient } from "./movements-client";
+import { ShopRole } from "@prisma/client";
 
 interface MovementsPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -14,6 +15,10 @@ export default async function MovementsPage({ params }: MovementsPageProps) {
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   const [movementsResult, shop] = await Promise.all([

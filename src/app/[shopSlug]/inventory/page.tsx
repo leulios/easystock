@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listProducts } from "@/lib/services/product-service";
 import { prisma } from "@/lib/db";
 import { InventoryClient } from "./inventory-client";
+import { ShopRole } from "@prisma/client";
 
 interface InventoryPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -14,6 +15,10 @@ export default async function InventoryPage({ params }: InventoryPageProps) {
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   const [productsResult, shop, siblingShops] = await Promise.all([

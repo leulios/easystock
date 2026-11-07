@@ -8,7 +8,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { quickRegisterProductAction } from "@/app/actions/products";
 import { useLanguage } from "@/lib/i18n/context";
 import { LanguageSwitcher } from "@/components/layout/language-switcher";
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, ShopRole } from "@prisma/client";
 import {
   Camera,
   Barcode,
@@ -68,11 +68,19 @@ interface MobileScannerClientProps {
   customers: Array<{ id: string; name: string; phone: string | null; outstandingCredit: number }>;
   shop: { id: string; name: string; currency: string };
   shopSlug: string;
+  userRole?: ShopRole;
 }
 
-export function MobileScannerClient({ products, customers, shop, shopSlug }: MobileScannerClientProps) {
+export function MobileScannerClient({
+  products,
+  customers,
+  shop,
+  shopSlug,
+  userRole = ShopRole.SHOP_OWNER,
+}: MobileScannerClientProps) {
   const router = useRouter();
   const { t, language } = useLanguage();
+  const isShopkeeper = userRole === ShopRole.SHOPKEEPER;
 
   // Catalog state - mutable so newly registered products can be scanned immediately
   const [catalog, setCatalog] = useState<ProductItem[]>(products);
@@ -361,6 +369,15 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
     if (!matched) {
       playBeep(440);
       setNotFoundCode(cleanCode);
+      if (isShopkeeper) {
+        showToast(
+          language === "am"
+            ? `ያልታወቀ ባርኮድ (${cleanCode})። ዕቃውን ለማስመዝገብ እባክዎ የሱቁን ባለቤት ያነጋግሩ።`
+            : `Unrecognized barcode (${cleanCode}). Please contact the Shop Owner to register this product.`,
+          "error"
+        );
+        return;
+      }
       setQuickBarcode(cleanCode);
       setQuickName("");
       setQuickSellingPrice("");
@@ -779,50 +796,64 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
         </div>
       </header>
 
-      {/* DUAL MODE SELECTOR: SELL vs STOCK IN */}
-      <div className="bg-slate-900/80 p-2 border-b border-slate-800 flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setMode("sell");
-            setIsReviewDrawerOpen(false);
-          }}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
-            mode === "sell"
-              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950 ring-2 ring-emerald-500/50"
-              : "bg-slate-800/70 text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Zap className="h-4 w-4" />
-          <span>{t("scannerModeSell")}</span>
+      {/* DUAL MODE SELECTOR: SELL vs STOCK IN (Locked to Sales-Only for Shopkeepers) */}
+      {isShopkeeper ? (
+        <div className="bg-slate-900/90 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-emerald-400 text-xs font-extrabold tracking-wide">
+            <Zap className="h-4 w-4 text-emerald-400" />
+            <span>{language === "am" ? "የሽያጭ መቃኛ (ፈጣን መሸጫ)" : "Sales Scanner (Fast POS)"}</span>
+          </div>
           {saleCart.length > 0 && (
-            <span className="bg-emerald-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
-              {totalSaleItemsCount}
+            <span className="bg-emerald-600 text-white text-[11px] px-2 py-0.5 rounded-full font-mono font-bold">
+              {totalSaleItemsCount} {language === "am" ? "ዕቃዎች" : "items"}
             </span>
           )}
-        </button>
+        </div>
+      ) : (
+        <div className="bg-slate-900/80 p-2 border-b border-slate-800 flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("sell");
+              setIsReviewDrawerOpen(false);
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+              mode === "sell"
+                ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950 ring-2 ring-emerald-500/50"
+                : "bg-slate-800/70 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <Zap className="h-4 w-4" />
+            <span>{t("scannerModeSell")}</span>
+            {saleCart.length > 0 && (
+              <span className="bg-emerald-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
+                {totalSaleItemsCount}
+              </span>
+            )}
+          </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            setMode("stock_in");
-            setIsReviewDrawerOpen(false);
-          }}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
-            mode === "stock_in"
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-950 ring-2 ring-blue-500/50"
-              : "bg-slate-800/70 text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <ArrowDownToLine className="h-4 w-4" />
-          <span>{t("scannerModeStockIn")}</span>
-          {receivingList.length > 0 && (
-            <span className="bg-blue-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
-              {totalReceivingUnits}
-            </span>
-          )}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("stock_in");
+              setIsReviewDrawerOpen(false);
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 transition-all ${
+              mode === "stock_in"
+                ? "bg-blue-600 text-white shadow-lg shadow-blue-950 ring-2 ring-blue-500/50"
+                : "bg-slate-800/70 text-slate-400 hover:text-slate-200"
+            }`}
+          >
+            <ArrowDownToLine className="h-4 w-4" />
+            <span>{t("scannerModeStockIn")}</span>
+            {receivingList.length > 0 && (
+              <span className="bg-blue-800 text-white text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold">
+                {totalReceivingUnits}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Sub-Tabs: Camera Scan vs Manual Search */}
       <div className="bg-slate-900/40 px-3 py-1.5 border-b border-slate-800/60 flex items-center justify-between text-xs">
@@ -1029,21 +1060,29 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
                 {filteredProducts.length === 0 ? (
                   <div className="p-4 text-center text-xs text-slate-400 bg-slate-900/60 rounded-xl border border-slate-800 space-y-2.5">
                     <p>{t("emptyCart")}</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuickBarcode(manualQuery.trim());
-                        setQuickName("");
-                        setQuickSellingPrice("");
-                        setQuickCostPrice("");
-                        setQuickInitialStock(mode === "stock_in" ? "5" : "1");
-                        setIsQuickRegisterOpen(true);
-                      }}
-                      className="py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>{t("registerNewProduct")}: &quot;{manualQuery}&quot;</span>
-                    </button>
+                    {!isShopkeeper ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickBarcode(manualQuery.trim());
+                          setQuickName("");
+                          setQuickSellingPrice("");
+                          setQuickCostPrice("");
+                          setQuickInitialStock(mode === "stock_in" ? "5" : "1");
+                          setIsQuickRegisterOpen(true);
+                        }}
+                        className="py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>{t("registerNewProduct")}: &quot;{manualQuery}&quot;</span>
+                      </button>
+                    ) : (
+                      <p className="text-[11px] text-slate-500 italic">
+                        {language === "am"
+                          ? "ዕቃው አልተገኘም። አዳዲስ ዕቃዎችን መመዝገብ የሚችሉት የሱቁ ባለቤት ብቻ ናቸው።"
+                          : "Product not found. Only Shop Owners can register new products."}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   filteredProducts.map((p) => (
@@ -1096,21 +1135,29 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
             </div>
 
             <div className="flex gap-2 pt-1 border-t border-amber-800/40">
-              <button
-                type="button"
-                onClick={() => {
-                  setQuickBarcode(notFoundCode);
-                  setQuickName("");
-                  setQuickSellingPrice("");
-                  setQuickCostPrice("");
-                  setQuickInitialStock(mode === "stock_in" ? "5" : "1");
-                  setIsQuickRegisterOpen(true);
-                }}
-                className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>{t("registerNewProduct")}</span>
-              </button>
+              {!isShopkeeper ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuickBarcode(notFoundCode);
+                    setQuickName("");
+                    setQuickSellingPrice("");
+                    setQuickCostPrice("");
+                    setQuickInitialStock(mode === "stock_in" ? "5" : "1");
+                    setIsQuickRegisterOpen(true);
+                  }}
+                  className="flex-1 py-2 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>{t("registerNewProduct")}</span>
+                </button>
+              ) : (
+                <p className="flex-1 text-xs text-amber-200 py-1">
+                  {language === "am"
+                    ? "ዕቃው አልተመዘገበም። እባክዎ ለሱቁ ባለቤት ያሳውቁ።"
+                    : "Product not registered. Contact shop owner to register."}
+                </p>
+              )}
 
               <button
                 type="button"
@@ -1902,7 +1949,7 @@ export function MobileScannerClient({ products, customers, shop, shopSlug }: Mob
       )}
 
       {/* QUICK REGISTER BOTTOM SHEET / MODAL */}
-      {isQuickRegisterOpen && (
+      {!isShopkeeper && isQuickRegisterOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col justify-end p-2 sm:p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-3xl max-h-[92vh] overflow-y-auto p-4 sm:p-6 space-y-4 animate-in slide-in-from-bottom shadow-2xl">
             {/* Modal Header */}

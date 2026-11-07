@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { TenantContext } from "../tenant/context";
+import { TenantContext, assertCanManageExpenses } from "../tenant/context";
 import {
   ExpenseInput,
   STANDARD_TRANSPORTATION_CATEGORY_EN,
@@ -64,6 +64,7 @@ export function parseDescriptionAndNotes(raw?: string | null): {
 export async function getShopExpenseCategories(
   context: TenantContext
 ): Promise<ExpenseCategoriesResult> {
+  assertCanManageExpenses(context, "Viewing expense categories");
   const { shopId } = context;
   const key = `expense_categories:${shopId}`;
 
@@ -135,6 +136,7 @@ export async function addCustomExpenseCategory(
   context: TenantContext,
   name: string
 ): Promise<CustomExpenseCategory[]> {
+  assertCanManageExpenses(context, "Adding custom expense category");
   const { organizationId, shopId, user } = context;
   const cleanName = name.trim();
 
@@ -192,6 +194,7 @@ export async function updateCustomExpenseCategory(
   id: string,
   newName: string
 ): Promise<CustomExpenseCategory[]> {
+  assertCanManageExpenses(context, "Updating custom expense category");
   const { organizationId, shopId, user } = context;
   const cleanName = newName.trim();
 
@@ -260,6 +263,7 @@ export async function deleteCustomExpenseCategory(
   context: TenantContext,
   id: string
 ): Promise<CustomExpenseCategory[]> {
+  assertCanManageExpenses(context, "Deleting custom expense category");
   const { organizationId, shopId, user } = context;
   const { custom } = await getShopExpenseCategories(context);
 
@@ -296,6 +300,7 @@ export async function deleteCustomExpenseCategory(
  * Creates a new business expense record with amount, category, date, optional description, and optional notes.
  */
 export async function createExpense(context: TenantContext, input: ExpenseInput) {
+  assertCanManageExpenses(context, "Recording business expense");
   const { organizationId, shopId, user } = context;
 
   // Combine description and notes cleanly if notes is supplied
@@ -364,6 +369,7 @@ export async function listExpenses(
     pageSize?: number;
   } = {}
 ) {
+  assertCanManageExpenses(context, "Viewing business expenses");
   const { shopId } = context;
   const { startDate, endDate, category, page = 1, pageSize = 30 } = options;
 

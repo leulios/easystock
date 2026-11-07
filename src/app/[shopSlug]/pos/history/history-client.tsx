@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ReturnModal } from "./return-modal";
 import { ReceiptModal } from "../receipt-modal";
 import { ArrowLeft, ShoppingCart, RotateCcw, Printer, Filter } from "lucide-react";
-import { SaleStatus } from "@prisma/client";
+import { SaleStatus, ShopRole } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useLanguage } from "@/lib/i18n/context";
 
@@ -16,11 +16,19 @@ interface HistoryClientProps {
   shopSlug: string;
   shopName: string;
   currency: string;
+  userRole?: ShopRole;
 }
 
-export function HistoryClient({ sales, shopSlug, shopName, currency }: HistoryClientProps) {
+export function HistoryClient({
+  sales,
+  shopSlug,
+  shopName,
+  currency,
+  userRole = ShopRole.SHOP_OWNER,
+}: HistoryClientProps) {
   const router = useRouter();
   const { t, language } = useLanguage();
+  const isShopkeeper = userRole === ShopRole.SHOPKEEPER;
   const [selectedSaleForReturn, setSelectedSaleForReturn] = useState<any>(null);
   const [selectedSaleForReceipt, setSelectedSaleForReceipt] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
@@ -48,9 +56,11 @@ export function HistoryClient({ sales, shopSlug, shopName, currency }: HistoryCl
           >
             <ArrowLeft className="h-3.5 w-3.5" /> {t("backToPOS")}
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">{t("salesHistoryTitle")}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            {isShopkeeper ? t("mySalesHistoryTitle") : t("salesHistoryTitle")}
+          </h1>
           <p className="text-sm text-slate-500">
-            {t("salesHistorySubtitle")}
+            {isShopkeeper ? t("mySalesHistorySubtitle") : t("salesHistorySubtitle")}
           </p>
         </div>
 
@@ -138,7 +148,7 @@ export function HistoryClient({ sales, shopSlug, shopName, currency }: HistoryCl
                         >
                           <Printer className="h-4 w-4" />
                         </button>
-                        {sale.status === SaleStatus.COMPLETED && (
+                        {sale.status === SaleStatus.COMPLETED && !isShopkeeper && (
                           <button
                             onClick={() => setSelectedSaleForReturn(sale)}
                             title={language === "am" ? "ዕቃ መመለሻ" : "Process Return"}

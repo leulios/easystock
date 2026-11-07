@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { TenantContext } from "../tenant/context";
 import { CreateSaleInput, ReturnSaleInput } from "../validations/sales";
-import { MovementType, SaleStatus, PaymentMethod, Prisma } from "@prisma/client";
+import { MovementType, SaleStatus, PaymentMethod, Prisma, ShopRole } from "@prisma/client";
 import { Decimal, calculateLineTotal, calculateTax } from "../decimal";
 
 export interface ListSalesOptions {
@@ -276,7 +276,13 @@ export async function createSale(context: TenantContext, input: CreateSaleInput)
 }
 
 export async function processReturn(context: TenantContext, input: ReturnSaleInput) {
-  const { organizationId, shopId, user } = context;
+  const { organizationId, shopId, user, role } = context;
+
+  if (role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    throw new Error(
+      "Unauthorized: Shopkeepers cannot edit, refund, or cancel completed sales. Returns and cancellations require Shop Owner authorization."
+    );
+  }
 
   const sale = await prisma.sale.findFirst({
     where: { id: input.saleId, shopId },
@@ -402,11 +408,12 @@ export async function processReturn(context: TenantContext, input: ReturnSaleInp
 }
 
 export async function listSales(context: TenantContext, options: ListSalesOptions = {}) {
-  const { shopId } = context;
+  const { shopId, role, user } = context;
   const { status, customerId, startDate, endDate, page = 1, pageSize = 20 } = options;
 
   const where: Prisma.SaleWhereInput = {
     shopId,
+    ...(role === ShopRole.SHOPKEEPER ? { cashierId: user.id } : {}),
     ...(status ? { status } : {}),
     ...(customerId ? { customerId } : {}),
     ...(startDate || endDate

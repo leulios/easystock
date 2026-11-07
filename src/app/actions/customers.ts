@@ -17,6 +17,7 @@ import {
   ListCustomersOptions,
 } from "@/lib/services/customer-service";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export async function getCustomersAction(options: ListCustomersOptions = {}) {
   const context = await getCurrentContext();
@@ -124,6 +125,13 @@ export async function deleteCustomerAction(customerId: string) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Shopkeepers cannot delete customer accounts.",
+    };
   }
 
   try {

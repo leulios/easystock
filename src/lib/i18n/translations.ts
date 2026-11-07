@@ -30,6 +30,14 @@ export interface Translations {
   navPhoneScanner: string;
   navStock: string;
   navStockHistory: string;
+  navSalesHistory: string;
+  navMySalesHistory: string;
+  mySalesHistoryTitle: string;
+  mySalesHistorySubtitle: string;
+  salesOnlyNotice: string;
+  productRegistrationOwnerOnly: string;
+  returnRequiresOwnerApproval: string;
+  salesScannerNotice: string;
   navItems: string;
   navImportItems: string;
   navReceiveGoods: string;
@@ -427,6 +435,14 @@ export const translations: Record<Language, Translations> = {
     navPhoneScanner: "Phone Barcode Scanner",
     navStock: "Stock & Inventory",
     navStockHistory: "Stock Movements",
+    navSalesHistory: "Sales History",
+    navMySalesHistory: "My Sales History",
+    mySalesHistoryTitle: "My Sales History",
+    mySalesHistorySubtitle: "Review transactions you personally recorded during your shifts",
+    salesOnlyNotice: "Sales-only access. Inventory and financial controls are reserved for Shop Owners.",
+    productRegistrationOwnerOnly: "Product not registered. Only Shop Owners can register new products.",
+    returnRequiresOwnerApproval: "Returns and cancellations require Shop Owner authorization.",
+    salesScannerNotice: "Sales Mode: Scan barcode to add products to the sales cart.",
     navItems: "Items & Prices",
     navImportItems: "Import Excel / CSV",
     navReceiveGoods: "Receive Goods (Purchase)",
@@ -823,6 +839,14 @@ export const translations: Record<Language, Translations> = {
     navPhoneScanner: "የስልክ ባርኮድ መቃኛ",
     navStock: "የዕቃ ክምችት (ስቶክ)",
     navStockHistory: "የዕቃዎች እንቅስቃሴ",
+    navSalesHistory: "የሽያጭ ታሪክ",
+    navMySalesHistory: "የኔ የሽያጭ ታሪክ",
+    mySalesHistoryTitle: "የኔ የሽያጭ ታሪክ",
+    mySalesHistorySubtitle: "በፈረቃዎ ያከናወኗቸውን የሽያጭ መዝገቦች ይመልከቱ",
+    salesOnlyNotice: "የሽያጭ አገልግሎት ብቻ። የክምችት እና የፋይናንስ ቁጥጥር ለሱቅ ባለቤት የተከለለ ነው።",
+    productRegistrationOwnerOnly: "ዕቃው አልተመዘገበም። አዳዲስ ዕቃዎችን መመዝገብ የሚችሉት የሱቁ ባለቤት ብቻ ናቸው።",
+    returnRequiresOwnerApproval: "ዕቃ መመለስ ወይም ሽያጭ መሰረዝ የሱቅ ባለቤት ፍቃድ ያስፈልገዋል።",
+    salesScannerNotice: "የመሸጫ ሁኔታ፡ ዕቃዎችን ወደ መሸጫ ቅርጫት ለመጨመር ባርኮድ ይቃኙ።",
     navItems: "የዕቃዎች ዝርዝርና ዋጋ",
     navImportItems: "ዕቃዎችን ከኤክሴል ጫን",
     navReceiveGoods: "የዕቃ ግዢና ርክክብ",

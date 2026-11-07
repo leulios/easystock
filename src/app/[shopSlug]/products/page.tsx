@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listProducts } from "@/lib/services/product-service";
 import { prisma } from "@/lib/db";
 import { ProductListClient } from "./product-list-client";
+import { ShopRole } from "@prisma/client";
 
 interface ProductsPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -14,6 +15,10 @@ export default async function ProductsPage({ params }: ProductsPageProps) {
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   const [productsResult, categories, shop] = await Promise.all([

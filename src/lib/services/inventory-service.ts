@@ -1,5 +1,5 @@
 import { prisma } from "../db";
-import { TenantContext } from "../tenant/context";
+import { TenantContext, assertCanManageInventory } from "../tenant/context";
 import { StockAdjustmentInput } from "../validations/catalog";
 import { MovementType, Prisma, ShopRole } from "@prisma/client";
 import { Decimal } from "../decimal";
@@ -12,6 +12,7 @@ export interface ListMovementsOptions {
 }
 
 export async function adjustStock(context: TenantContext, input: StockAdjustmentInput) {
+  assertCanManageInventory(context, "Stock adjustment");
   const { organizationId, shopId, user, role, permissions } = context;
 
   // 1. Authorization check: requires permission or Shop Owner
@@ -125,6 +126,7 @@ export async function adjustStock(context: TenantContext, input: StockAdjustment
 }
 
 export async function listStockMovements(context: TenantContext, options: ListMovementsOptions = {}) {
+  assertCanManageInventory(context, "Viewing stock movements");
   const { shopId } = context;
   const { variantId, movementType, page = 1, pageSize = 25 } = options;
 
@@ -372,13 +374,8 @@ export interface BatchStockInInput {
 }
 
 export async function batchReceiveStock(context: TenantContext, input: BatchStockInInput) {
+  assertCanManageInventory(context, "Stock receiving");
   const { organizationId, shopId, user, role, permissions } = context;
-
-  // 1. Authorization check
-  const isAuthorized = role === ShopRole.SHOP_OWNER || permissions.canAdjustStock;
-  if (!isAuthorized) {
-    throw new Error("You do not have permission to receive inventory stock.");
-  }
 
   // 2. Validate input
   if (!input.items || input.items.length === 0) {

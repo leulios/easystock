@@ -1,7 +1,7 @@
 import { prisma } from "../db";
-import { TenantContext } from "../tenant/context";
+import { TenantContext, assertCanManageInventory } from "../tenant/context";
 import { ProductInput } from "../validations/catalog";
-import { MovementType, Prisma } from "@prisma/client";
+import { MovementType, Prisma, ShopRole } from "@prisma/client";
 import { Decimal } from "../decimal";
 
 export interface ListProductsOptions {
@@ -14,6 +14,7 @@ export interface ListProductsOptions {
 }
 
 export async function createProduct(context: TenantContext, input: ProductInput) {
+  assertCanManageInventory(context, "Product creation");
   const { organizationId, shopId, user } = context;
 
   // 1. Verify SKU uniqueness within this organization
@@ -105,6 +106,7 @@ export async function updateProduct(
   productId: string,
   input: Partial<ProductInput>
 ) {
+  assertCanManageInventory(context, "Product updating");
   const { organizationId, shopId, user } = context;
 
   const product = await prisma.product.findFirst({
@@ -177,6 +179,7 @@ export async function updateProduct(
 }
 
 export async function archiveProduct(context: TenantContext, productId: string) {
+  assertCanManageInventory(context, "Product deletion/archival");
   const { organizationId, shopId, user } = context;
 
   const product = await prisma.product.findFirst({
@@ -270,7 +273,7 @@ export async function listProducts(context: TenantContext, options: ListProducts
       category: product.category?.name || "Uncategorized",
       categoryId: product.categoryId,
       variantId: primaryVariant?.id,
-      costPrice: primaryVariant ? Number(primaryVariant.costPrice) : 0,
+      costPrice: context.role === ShopRole.SHOPKEEPER ? 0 : (primaryVariant ? Number(primaryVariant.costPrice) : 0),
       sellingPrice: primaryVariant ? Number(primaryVariant.sellingPrice) : 0,
       reorderLevel: primaryVariant?.reorderLevel ?? 5,
       currentStock,

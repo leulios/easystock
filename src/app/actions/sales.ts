@@ -4,7 +4,7 @@ import { getCurrentContext } from "./auth";
 import { createSaleSchema, CreateSaleInput, returnSaleSchema, ReturnSaleInput } from "@/lib/validations/sales";
 import { createSale, processReturn, listSales, ListSalesOptions } from "@/lib/services/sales-service";
 import { prisma } from "@/lib/db";
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, ShopRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
 
@@ -43,6 +43,13 @@ export async function returnSaleAction(data: ReturnSaleInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Returns and cancellations require Shop Owner authorization.",
+    };
   }
 
   const parsed = returnSaleSchema.safeParse(data);

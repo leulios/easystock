@@ -90,6 +90,7 @@ export default async function ScanPage({ params, searchParams }: ScanPageProps) 
         currency: shop.currency,
       }}
       shopSlug={shopSlug}
+      userRole={context.role}
     />
   );
 }

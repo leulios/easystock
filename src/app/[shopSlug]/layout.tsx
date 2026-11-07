@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
+import { ShopRole } from "@prisma/client";
 
 interface ShopLayoutProps {
   children: React.ReactNode;
@@ -31,20 +32,28 @@ export default async function ShopLayout({ children, params }: ShopLayoutProps) 
     redirect("/");
   }
 
+  // If Shopkeeper, verify they belong to this specific shop
+  if (context.role === ShopRole.SHOPKEEPER && context.shopId !== currentShop.id && !context.isPlatformAdmin) {
+    redirect(`/${context.shopId}/dashboard`);
+  }
+
   // Fetch all shops available to this user in their organization
-  const availableShops = await prisma.shop.findMany({
-    where: {
-      organizationId: context.organizationId,
-      deletedAt: null,
-      isActive: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      code: true,
-    },
-    orderBy: { name: "asc" },
-  });
+  const isOrgOwner = context.role === ShopRole.SHOP_OWNER || context.isPlatformAdmin;
+  const availableShops = isOrgOwner
+    ? await prisma.shop.findMany({
+        where: {
+          organizationId: context.organizationId,
+          deletedAt: null,
+          isActive: true,
+        },
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+        orderBy: { name: "asc" },
+      })
+    : [{ id: currentShop.id, name: currentShop.name, code: currentShop.code }];
 
   return (
     <div className="min-h-screen flex bg-slate-50">

@@ -163,12 +163,8 @@ describe("Simplified and Customizable Business Expense Categories", () => {
       platformRole: PlatformRole.NONE,
       isActive: true,
     },
-    membership: {
-      id: "m-1",
-      userId: "owner-1",
-      organizationId: "org-1",
-      shopId: "shop-1",
-      role: ShopRole.SHOP_OWNER,
+    role: ShopRole.SHOP_OWNER,
+    permissions: {
       canViewReports: true,
       canApplyDiscount: true,
       canAdjustStock: true,
@@ -186,12 +182,8 @@ describe("Simplified and Customizable Business Expense Categories", () => {
       platformRole: PlatformRole.NONE,
       isActive: true,
     },
-    membership: {
-      id: "m-2",
-      userId: "owner-2",
-      organizationId: "org-2",
-      shopId: "shop-2",
-      role: ShopRole.SHOP_OWNER,
+    role: ShopRole.SHOP_OWNER,
+    permissions: {
       canViewReports: true,
       canApplyDiscount: true,
       canAdjustStock: true,

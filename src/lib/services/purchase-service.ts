@@ -1,10 +1,11 @@
 import { prisma } from "../db";
-import { TenantContext } from "../tenant/context";
+import { TenantContext, assertCanManagePurchases } from "../tenant/context";
 import { SupplierInput, PurchaseOrderInput, ReceivePurchaseInput } from "../validations/purchase";
 import { MovementType, POStatus, Prisma } from "@prisma/client";
 import { Decimal } from "../decimal";
 
 export async function createSupplier(context: TenantContext, input: SupplierInput) {
+  assertCanManagePurchases(context, "Supplier creation");
   const { organizationId, shopId, user } = context;
 
   const supplier = await prisma.supplier.create({
@@ -35,6 +36,7 @@ export async function createSupplier(context: TenantContext, input: SupplierInpu
 }
 
 export async function listSuppliers(context: TenantContext) {
+  assertCanManagePurchases(context, "Viewing suppliers");
   const { organizationId } = context;
   return prisma.supplier.findMany({
     where: { organizationId, deletedAt: null },
@@ -43,6 +45,7 @@ export async function listSuppliers(context: TenantContext) {
 }
 
 export async function createPurchaseOrder(context: TenantContext, input: PurchaseOrderInput) {
+  assertCanManagePurchases(context, "Purchase order creation");
   const { organizationId, shopId, user } = context;
 
   // 1. Verify PO number uniqueness in this shop
@@ -126,6 +129,7 @@ export async function createPurchaseOrder(context: TenantContext, input: Purchas
 }
 
 export async function receivePurchaseStock(context: TenantContext, input: ReceivePurchaseInput) {
+  assertCanManagePurchases(context, "Stock receiving from purchase order");
   const { organizationId, shopId, user } = context;
 
   const po = await prisma.purchaseOrder.findFirst({
@@ -256,6 +260,7 @@ export async function receivePurchaseStock(context: TenantContext, input: Receiv
 }
 
 export async function listPurchaseOrders(context: TenantContext, options: { status?: POStatus; page?: number; pageSize?: number } = {}) {
+  assertCanManagePurchases(context, "Viewing purchase orders");
   const { shopId } = context;
   const { status, page = 1, pageSize = 20 } = options;
 

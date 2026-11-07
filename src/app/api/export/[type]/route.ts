@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentContext } from "@/app/actions/auth";
+import { ShopRole } from "@prisma/client";
 import {
   getSalesReportData,
   getInventoryValuationReportData,
@@ -16,6 +17,13 @@ export async function GET(
 
   if (!context) {
     return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return new NextResponse(
+      "Forbidden: Shopkeepers have sales-only access and cannot export business or inventory reports.",
+      { status: 403 }
+    );
   }
 
   const { searchParams } = new URL(req.url);

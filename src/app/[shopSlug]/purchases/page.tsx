@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { listPurchaseOrders } from "@/lib/services/purchase-service";
 import { prisma } from "@/lib/db";
 import { PurchasesClient } from "./purchases-client";
+import { ShopRole } from "@prisma/client";
 
 interface PurchasesPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -14,6 +15,10 @@ export default async function PurchasesPage({ params }: PurchasesPageProps) {
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   const [ordersResult, shop] = await Promise.all([

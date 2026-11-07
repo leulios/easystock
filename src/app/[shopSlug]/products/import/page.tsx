@@ -2,6 +2,7 @@ import React from "react";
 import { getCurrentContext } from "@/app/actions/auth";
 import { redirect } from "next/navigation";
 import { ProductImportClient } from "./product-import-client";
+import { ShopRole } from "@prisma/client";
 
 export default async function ProductImportPage({
   params,
@@ -13,6 +14,10 @@ export default async function ProductImportPage({
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   return <ProductImportClient shopSlug={shopSlug} />;

@@ -4,6 +4,7 @@ import { listSuppliers } from "@/lib/services/purchase-service";
 import { listProducts } from "@/lib/services/product-service";
 import { prisma } from "@/lib/db";
 import { NewPOClient } from "./new-po-client";
+import { ShopRole } from "@prisma/client";
 
 interface NewPOPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -15,6 +16,10 @@ export default async function NewPOPage({ params }: NewPOPageProps) {
 
   if (!context) {
     redirect("/login");
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    redirect(`/${shopSlug}/dashboard`);
   }
 
   const [suppliers, productsResult, shop] = await Promise.all([

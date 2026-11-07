@@ -14,11 +14,16 @@ import {
   removeStaffMember,
 } from "@/lib/services/staff-service";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export async function listStaffAction() {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can view staff lists." };
   }
 
   try {
@@ -33,6 +38,10 @@ export async function addStaffAction(data: InviteStaffInput) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can invite staff." };
   }
 
   const parsed = inviteStaffSchema.safeParse(data);
@@ -59,6 +68,10 @@ export async function updateStaffAction(data: UpdateStaffInput) {
     return { success: false, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can modify staff permissions." };
+  }
+
   const parsed = updateStaffSchema.safeParse(data);
   if (!parsed.success) {
     return {
@@ -81,6 +94,10 @@ export async function removeStaffAction(membershipId: string) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return { success: false, error: "Unauthorized: Only Shop Owners can remove staff." };
   }
 
   try {

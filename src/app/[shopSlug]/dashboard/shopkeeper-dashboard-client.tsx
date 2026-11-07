@@ -97,10 +97,10 @@ export function ShopkeeperDashboardClient({
               {language === "am" ? "የክምችት ማስጠንቀቂያዎች" : "Stock Alerts for Cashiers"}
             </h2>
             <Link
-              href={`/${shopSlug}/inventory`}
+              href={`/${shopSlug}/pos`}
               className="text-xs text-blue-600 hover:underline font-medium"
             >
-              {language === "am" ? "ዕቃዎችን ይመልከቱ →" : "Browse Catalog →"}
+              {language === "am" ? "ወደ መሸጫ ይሂዱ →" : "Go to Register →"}
             </Link>
           </div>
 

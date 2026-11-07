@@ -20,6 +20,7 @@ import {
   LogOut,
   ChevronRight,
   Scan,
+  History,
 } from "lucide-react";
 import { ShopRole } from "@prisma/client";
 import { useLanguage } from "@/lib/i18n/context";
@@ -58,16 +59,34 @@ export function MobileBottomNav({ shopId, role, isPlatformAdmin }: MobileBottomN
       isCenter: true,
       active: pathname.includes("/scan"),
     },
-    {
-      name: language === "am" ? "ስቶክ" : "Stock",
-      href: `/${shopId}/inventory`,
-      icon: Boxes,
-      active: pathname.startsWith(`/${shopId}/inventory`),
-    },
+    role === ShopRole.SHOPKEEPER
+      ? {
+          name: language === "am" ? "የኔ ሽያጭ" : "My Sales",
+          href: `/${shopId}/pos/history`,
+          icon: History,
+          active: pathname.startsWith(`/${shopId}/pos/history`),
+        }
+      : {
+          name: language === "am" ? "ስቶክ" : "Stock",
+          href: `/${shopId}/inventory`,
+          icon: Boxes,
+          active: pathname.startsWith(`/${shopId}/inventory`),
+        },
   ];
 
   // More Drawer Items
-  const moreItems = [
+  const moreItems: Array<{
+    name: string;
+    href: string;
+    icon: React.ComponentType<{ className?: string }>;
+    roles: ShopRole[];
+  }> = [
+    {
+      name: t("navMySalesHistory"),
+      href: `/${shopId}/pos/history`,
+      icon: History,
+      roles: [ShopRole.SHOPKEEPER],
+    },
     {
       name: t("navItems"),
       href: `/${shopId}/products`,
@@ -84,7 +103,7 @@ export function MobileBottomNav({ shopId, role, isPlatformAdmin }: MobileBottomN
       name: t("navCustomers"),
       href: `/${shopId}/customers`,
       icon: Users,
-      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER, ShopRole.SHOPKEEPER],
+      roles: [ShopRole.SHOP_OWNER, ShopRole.SHOP_MANAGER],
     },
     {
       name: t("navExpenses"),

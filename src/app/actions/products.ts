@@ -11,6 +11,7 @@ import {
 } from "@/lib/services/product-service";
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { ShopRole } from "@prisma/client";
 
 export interface QuickRegisterProductInput {
   name: string;
@@ -25,6 +26,13 @@ export async function quickRegisterProductAction(data: QuickRegisterProductInput
   const context = await getCurrentContext();
   if (!context) {
     return { success: false as const, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false as const,
+      error: "Unauthorized: Shopkeepers cannot register products. Product creation is reserved for Shop Owners.",
+    };
   }
 
   const cleanName = data.name?.trim();
@@ -133,6 +141,13 @@ export async function createProductAction(data: ProductInput) {
     return { success: false, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Shopkeepers cannot create products. Product management is reserved for Shop Owners.",
+    };
+  }
+
   const parsed = productSchema.safeParse(data);
   if (!parsed.success) {
     return {
@@ -159,6 +174,13 @@ export async function updateProductAction(productId: string, data: Partial<Produ
     return { success: false, error: "Not authenticated" };
   }
 
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Shopkeepers cannot edit products. Product management is reserved for Shop Owners.",
+    };
+  }
+
   try {
     const updated = await updateProduct(context, productId, data);
     revalidatePath(`/${context.shopId}/products`);
@@ -174,6 +196,13 @@ export async function archiveProductAction(productId: string) {
   const context = await getCurrentContext();
   if (!context) {
     return { success: false, error: "Not authenticated" };
+  }
+
+  if (context.role === ShopRole.SHOPKEEPER && !context.isPlatformAdmin) {
+    return {
+      success: false,
+      error: "Unauthorized: Shopkeepers cannot delete products. Product management is reserved for Shop Owners.",
+    };
   }
 
   try {
