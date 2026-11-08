@@ -33,7 +33,15 @@ import {
   Power,
   Copy,
   Check,
+  Send,
+  ExternalLink,
+  BellRing,
+  Sparkles,
 } from "lucide-react";
+import {
+  getTelegramLinkUrlAction,
+  disconnectTelegramAction,
+} from "@/app/actions/telegram";
 
 interface StaffItem {
   id: string;
@@ -79,21 +87,62 @@ interface SettingsClientProps {
   };
   initialStaff: StaffItem[];
   currentUserRole: ShopRole;
+  initialTelegramAccount?: {
+    id: string;
+    telegramChatId: string;
+    telegramUsername: string | null;
+    firstName: string | null;
+    isActive: boolean;
+    createdAt: Date;
+  } | null;
 }
 
 export function SettingsClient({
   initialShop,
   initialStaff,
   currentUserRole,
+  initialTelegramAccount,
 }: SettingsClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, language } = useLanguage();
 
   const tabParam = searchParams?.get("tab");
-  const [activeTab, setActiveTab] = useState<"general" | "financial" | "receipt" | "staff">(
-    tabParam === "staff" ? "staff" : "general"
+  const [activeTab, setActiveTab] = useState<"general" | "financial" | "receipt" | "staff" | "telegram">(
+    tabParam === "staff" ? "staff" : tabParam === "telegram" ? "telegram" : "general"
   );
+
+  // Telegram integration state
+  const [telegramAccount, setTelegramAccount] = useState(initialTelegramAccount || null);
+  const [isConnectingTelegram, setIsConnectingTelegram] = useState(false);
+  const [telegramError, setTelegramError] = useState<string | null>(null);
+
+  const handleConnectTelegram = async () => {
+    setIsConnectingTelegram(true);
+    setTelegramError(null);
+    const res = await getTelegramLinkUrlAction();
+    setIsConnectingTelegram(false);
+    if (res.success && res.linkUrl) {
+      window.open(res.linkUrl, "_blank");
+    } else {
+      setTelegramError(res.error || (language === "am" ? "የቴሌግራም ሊንክ ማመንጨት አልተቻለም" : "Failed to generate Telegram link"));
+    }
+  };
+
+  const handleDisconnectTelegram = async () => {
+    const confirmPrompt = language === "am"
+      ? "እርግጠኛ ነዎት የቴሌግራም ግንኙነትዎን ማቋረጥ ይፈልጋሉ?"
+      : "Are you sure you want to disconnect your Telegram account from this shop?";
+    if (!confirm(confirmPrompt)) return;
+
+    const res = await disconnectTelegramAction();
+    if (res.success) {
+      setTelegramAccount(null);
+      router.refresh();
+    } else {
+      alert(res.error || (language === "am" ? "ማላቀቅ አልተቻለም" : "Failed to disconnect"));
+    }
+  };
 
   // Shop settings form state
   const [name, setName] = useState(initialShop.name);
@@ -261,6 +310,20 @@ export function SettingsClient({
           }`}
         >
           <Users className="h-4 w-4" /> {t("tabStaff")} ({initialStaff.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("telegram")}
+          className={`pb-3 px-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${
+            activeTab === "telegram"
+              ? "border-sky-500 text-sky-600"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Send className="h-4 w-4" /> {t("tabTelegram")}
+          {telegramAccount?.isActive && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+          )}
         </button>
       </div>
 
@@ -746,6 +809,173 @@ export function SettingsClient({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: Telegram Integration */}
+      {activeTab === "telegram" && (
+        <div className="space-y-6">
+          {/* Main Status & Action Card */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+              <div className="flex items-start gap-3">
+                <div className="p-3 bg-sky-50 border border-sky-100 rounded-xl text-sky-600 shrink-0">
+                  <Send className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-slate-900">{t("telegramIntegrationTitle")}</h2>
+                    {telegramAccount?.isActive ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> {t("telegramStatusConnected")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                        {t("telegramStatusNotConnected")}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1 max-w-xl">
+                    {t("telegramIntegrationSubtitle")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Button */}
+              <div>
+                {telegramAccount?.isActive ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleDisconnectTelegram}
+                    className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 text-xs h-9"
+                  >
+                    <Power className="h-3.5 w-3.5 mr-1.5" />
+                    {t("telegramDisconnectBtn")}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleConnectTelegram}
+                    disabled={isConnectingTelegram}
+                    className="bg-sky-500 hover:bg-sky-600 text-white font-semibold text-xs h-9 shadow-sm"
+                  >
+                    <Send className="h-3.5 w-3.5 mr-1.5" />
+                    {isConnectingTelegram ? t("telegramOpeningBot") : t("telegramConnectBtn")}
+                    <ExternalLink className="h-3 w-3 ml-1.5 opacity-70" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {telegramError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                <span>{telegramError}</span>
+              </div>
+            )}
+
+            {/* Connection Details if Active */}
+            {telegramAccount?.isActive ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    {t("telegramChatIdLabel")}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-800">
+                    {telegramAccount.telegramChatId}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    {t("telegramUsernameLabel")}
+                  </span>
+                  <span className="text-xs font-medium text-slate-800">
+                    {telegramAccount.telegramUsername ? `@${telegramAccount.telegramUsername}` : (language === "am" ? "የለም" : "Not set")}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    {t("telegramLinkedSince")}
+                  </span>
+                  <span className="text-xs text-slate-600">
+                    {new Date(telegramAccount.createdAt).toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-sky-50/60 border border-sky-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-sky-800">
+                <div className="flex items-center gap-2.5">
+                  <Sparkles className="h-4 w-4 text-sky-600 shrink-0" />
+                  <span>
+                    {language === "am"
+                      ? "ቴሌግራምን ለማገናኘት ከላይ ያለውን አዝራር ይጫኑ። አፑ በቀጥታ በቴሌግራም ይከፈታል እና ያገናኝዎታል።"
+                      : "Tap 'Connect Telegram' above. Your Telegram app will open with a secure one-time link."}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Feature Highlights Grid */}
+            <div className="pt-2">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-3">
+                {t("telegramFeaturesTitle")}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl border border-slate-100 bg-white hover:border-slate-200 transition-colors flex items-start gap-3">
+                  <div className="p-2 bg-amber-50 rounded-lg text-amber-600 shrink-0">
+                    <BellRing className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">{t("telegramFeatureAlerts")}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {language === "am" ? "ዕቃዎች ከዝቅተኛ መጠን በታች ሲደርሱ ወዲያውኑ ማስታወቂያ ይደርስዎታል" : "Get notified immediately whenever products drop below their reorder level."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-slate-100 bg-white hover:border-slate-200 transition-colors flex items-start gap-3">
+                  <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600 shrink-0">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">{t("telegramFeatureApprovals")}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {language === "am" ? "የሰራተኞች የዕቃ ብልሽት ወይም ልዩነት ጥያቄዎችን በቴሌግራም አጽድቅ/ከልክል" : "Review shopkeeper discrepancy notes and approve ledger updates with 1 tap."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-slate-100 bg-white hover:border-slate-200 transition-colors flex items-start gap-3">
+                  <div className="p-2 bg-blue-50 rounded-lg text-blue-600 shrink-0">
+                    <Receipt className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">{t("telegramFeatureInvoices")}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {language === "am" ? "የአቅራቢ ደረሰኞችን በካሜራ አንስተው በመላክ ወደ ግዢ ወይም ወጪ ይቀይሩ" : "Send paper delivery receipts to the bot and convert them into Purchase Orders."}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl border border-slate-100 bg-white hover:border-slate-200 transition-colors flex items-start gap-3">
+                  <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600 shrink-0">
+                    <TrendingUp className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800">{t("telegramFeatureReports")}</h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      {language === "am" ? "የዕለቱ ጠቅላላ ገቢ፣ የሰራተኞች ሽያጭ እና ትርፍ በ /summary ይመልከቱ" : "Check today's shift revenue, top items, and cashier sales counts via /summary."}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

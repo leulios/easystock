@@ -411,6 +411,24 @@ export interface Translations {
   copyCredentialsBtn: string;
   credentialsCopied: string;
 
+  // Telegram Integration
+  tabTelegram: string;
+  telegramIntegrationTitle: string;
+  telegramIntegrationSubtitle: string;
+  telegramStatusConnected: string;
+  telegramStatusNotConnected: string;
+  telegramConnectBtn: string;
+  telegramDisconnectBtn: string;
+  telegramOpeningBot: string;
+  telegramChatIdLabel: string;
+  telegramUsernameLabel: string;
+  telegramLinkedSince: string;
+  telegramFeaturesTitle: string;
+  telegramFeatureAlerts: string;
+  telegramFeatureApprovals: string;
+  telegramFeatureInvoices: string;
+  telegramFeatureReports: string;
+
   // Dashboard, Ledger & Misc
   activeCashierShift: string;
   welcomeTerminal: string;
@@ -844,6 +862,24 @@ export const translations: Record<Language, Translations> = {
     copyCredentialsBtn: "Copy Login Details",
     credentialsCopied: "Credentials copied to clipboard!",
 
+    // Telegram Integration
+    tabTelegram: "Telegram",
+    telegramIntegrationTitle: "Telegram Communication Center",
+    telegramIntegrationSubtitle: "Connect your Telegram account to receive real-time alerts, monitor sales, and approve staff requests from anywhere.",
+    telegramStatusConnected: "Connected",
+    telegramStatusNotConnected: "Not Connected",
+    telegramConnectBtn: "Connect Telegram",
+    telegramDisconnectBtn: "Disconnect Telegram",
+    telegramOpeningBot: "Opening Telegram...",
+    telegramChatIdLabel: "Telegram Chat ID",
+    telegramUsernameLabel: "Username",
+    telegramLinkedSince: "Connected Since",
+    telegramFeaturesTitle: "Quick Actions Available in Telegram",
+    telegramFeatureAlerts: "Instant Low Stock & Reorder Notifications",
+    telegramFeatureApprovals: "1-Click Approvals for Shopkeeper Requests",
+    telegramFeatureInvoices: "Take Photos of Supplier Invoices & Delivery Slips",
+    telegramFeatureReports: "Daily Sales Summaries & Cashier Performance Breakdown",
+
     // Dashboard, Ledger & Misc
     activeCashierShift: "Active Cashier Shift",
     welcomeTerminal: "Welcome to",
@@ -1275,6 +1311,24 @@ export const translations: Record<Language, Translations> = {
     credentialsCardDesc: "ሰራተኛው ወደ ሲስተሙ እንዲገባ እነዚህን የመግቢያ መረጃዎች ይስጡት፦",
     copyCredentialsBtn: "የመግቢያ መረጃውን ቅዳ",
     credentialsCopied: "መረጃው ተቀድቷል!",
+
+    // Telegram Integration
+    tabTelegram: "ቴሌግራም",
+    telegramIntegrationTitle: "የቴሌግራም የቢዝነስ መገናኛ ማዕከል",
+    telegramIntegrationSubtitle: "የክምችት ማስጠንቀቂያዎችን ለመቀበል፣ የዕለት ሽያጭን ለመከታተል እና የሰራተኛ ጥያቄዎችን በቴሌግራም ለማጽደቅ መለያዎን ያገናኙ።",
+    telegramStatusConnected: "ተገናኝቷል",
+    telegramStatusNotConnected: "አልተገናኘም",
+    telegramConnectBtn: "ቴሌግራምን አገናኝ",
+    telegramDisconnectBtn: "ቴሌግራምን አላቅቅ",
+    telegramOpeningBot: "ቴሌግራምን በመክፈት ላይ...",
+    telegramChatIdLabel: "የቴሌግራም መለያ (Chat ID)",
+    telegramUsernameLabel: "የተጠቃሚ ስም",
+    telegramLinkedSince: "የተገናኘበት ቀን",
+    telegramFeaturesTitle: "በቴሌግራም የሚሰሩ ፈጣን ስራዎች",
+    telegramFeatureAlerts: "የዝቅተኛ ዕቃ ክምችት ማስጠንቀቂያዎች ወዲያውኑ ይደርስዎታል",
+    telegramFeatureApprovals: "የሰራተኞች የዕቃ ማስተካከያ ጥያቄዎችን በ1 ጠቅታ ማጽደቅ",
+    telegramFeatureInvoices: "የአቅራቢዎችን ደረሰኝ በፎቶ አንስቶ በቀጥታ መመዝገብ",
+    telegramFeatureReports: "የዕለቱ የሽያጭ ማጠቃለያ እና የሰራተኞች ሽያጭ ዝርዝር",
 
     // Dashboard, Ledger & Misc
     activeCashierShift: "የሽያጭ ሰራተኛ ፈረቃ",

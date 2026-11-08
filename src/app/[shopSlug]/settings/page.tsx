@@ -4,6 +4,7 @@ import { getShopSettings } from "@/lib/services/shop-service";
 import { listShopStaff } from "@/lib/services/staff-service";
 import { SettingsClient } from "./settings-client";
 import { ShopRole } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 interface SettingsPageProps {
   params: Promise<{ shopSlug: string }>;
@@ -22,9 +23,24 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
     redirect(`/${shopSlug}/dashboard`);
   }
 
-  const [shop, staff] = await Promise.all([
+  const [shop, staff, telegramAccount] = await Promise.all([
     getShopSettings(context),
     listShopStaff(context),
+    prisma.telegramAccount.findFirst({
+      where: {
+        userId: context.user.id,
+        shopId: context.shopId,
+        isActive: true,
+      },
+      select: {
+        id: true,
+        telegramChatId: true,
+        telegramUsername: true,
+        firstName: true,
+        isActive: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   return (
@@ -32,6 +48,7 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
       initialShop={shop}
       initialStaff={staff}
       currentUserRole={context.role}
+      initialTelegramAccount={telegramAccount}
     />
   );
 }
