@@ -152,6 +152,19 @@ export class TelegramClient {
   }
 
   /**
+   * Get current webhook status
+   */
+  public async getWebhookInfo(): Promise<{
+    url?: string;
+    has_custom_certificate?: boolean;
+    pending_update_count?: number;
+    last_error_date?: number;
+    last_error_message?: string;
+  } | null> {
+    return this.callApi("getWebhookInfo", {});
+  }
+
+  /**
    * Get basic bot identity info
    */
   public async getMe() {

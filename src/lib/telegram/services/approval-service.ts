@@ -12,6 +12,15 @@ export interface CreateApprovalInput {
 }
 
 /**
+ * Generates human-readable reference tracking codes: REQ-YYYYMMDD-XXXX
+ */
+export function generateApprovalReferenceCode(): string {
+  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `REQ-${datePart}-${randomPart}`;
+}
+
+/**
  * Creates a new approval request submitted by a Shopkeeper.
  */
 export async function createApprovalRequest(
@@ -19,9 +28,11 @@ export async function createApprovalRequest(
   input: CreateApprovalInput
 ) {
   const { shopId, user } = context;
+  const referenceCode = generateApprovalReferenceCode();
 
   const request = await prisma.approvalRequest.create({
     data: {
+      referenceCode,
       shopId,
       requesterId: user.id,
       approvalType: input.approvalType,
@@ -45,6 +56,7 @@ export async function createApprovalRequest(
       entityType: "ApprovalRequest",
       entityId: request.id,
       newData: {
+        referenceCode: request.referenceCode,
         type: input.approvalType,
         title: input.title,
       },
@@ -203,5 +215,18 @@ export async function listPendingRequests(context: TenantContext) {
     include: { requester: true },
     orderBy: { createdAt: "desc" },
     take: 20,
+  });
+}
+
+/**
+ * Lists recent requests submitted by a specific user (for /myrequests).
+ */
+export async function listUserRequests(context: TenantContext) {
+  const { shopId, user } = context;
+  return prisma.approvalRequest.findMany({
+    where: { shopId, requesterId: user.id },
+    include: { requester: true },
+    orderBy: { createdAt: "desc" },
+    take: 10,
   });
 }

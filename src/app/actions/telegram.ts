@@ -100,13 +100,15 @@ export async function getTelegramAccountStatusAction(): Promise<{
         telegramUsername: true,
         firstName: true,
         isActive: true,
+        language: true,
+        notificationPreferences: true,
         createdAt: true,
       },
     });
 
     return {
       success: true,
-      account,
+      account: account as any,
       botUsername,
     };
   } catch (error: any) {
@@ -117,5 +119,35 @@ export async function getTelegramAccountStatusAction(): Promise<{
       botUsername: process.env.TELEGRAM_BOT_USERNAME || "EasyStockApp_bot",
       error: error.message,
     };
+  }
+}
+
+/**
+ * Updates notification preferences for the connected Telegram account.
+ */
+export async function updateTelegramNotificationPreferencesAction(
+  preferences: Record<string, boolean>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const context = await getCurrentContext();
+    if (!context || !context.user || !context.shopId) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    await prisma.telegramAccount.updateMany({
+      where: {
+        userId: context.user.id,
+        shopId: context.shopId,
+      },
+      data: {
+        notificationPreferences: preferences,
+      },
+    });
+
+    revalidatePath(`/${context.shopId}/settings`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("[TelegramAction] Error updating notification preferences:", error);
+    return { success: false, error: error.message };
   }
 }

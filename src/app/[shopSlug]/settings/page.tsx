@@ -38,6 +38,8 @@ export default async function SettingsPage({ params }: SettingsPageProps) {
         telegramUsername: true,
         firstName: true,
         isActive: true,
+        language: true,
+        notificationPreferences: true,
         createdAt: true,
       },
     }),

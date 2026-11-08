@@ -95,8 +95,28 @@ export interface SendPhotoOptions {
   reply_markup?: TelegramInlineKeyboardMarkup;
 }
 
+export interface NotificationPreferences {
+  newSales?: boolean;
+  dailySummary?: boolean;
+  lowStock?: boolean;
+  inventoryRequests?: boolean;
+  approvals?: boolean;
+  purchaseInvoices?: boolean;
+  messages?: boolean;
+  businessEvents?: boolean;
+}
+
+export type MessageCategory =
+  | "GENERAL"
+  | "SALES_ISSUE"
+  | "STOCK_REQUEST"
+  | "CUSTOMER_ISSUE"
+  | "PURCHASE_INFO"
+  | "OTHER";
+
 export interface BotContext {
   chatId: string;
+  language: "en" | "am";
   user?: {
     id: string;
     email: string;
@@ -113,7 +133,9 @@ export interface BotContext {
   isLinked: boolean;
   telegramAccount?: {
     id: string;
+    language: "en" | "am";
     notifications: string;
+    notificationPreferences?: NotificationPreferences;
     telegramUsername?: string | null;
   };
 }

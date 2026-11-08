@@ -21,17 +21,23 @@ export default async function PurchasesPage({ params }: PurchasesPageProps) {
     redirect(`/${shopSlug}/dashboard`);
   }
 
-  const [ordersResult, shop] = await Promise.all([
+  const [ordersResult, shop, documents] = await Promise.all([
     listPurchaseOrders(context, { pageSize: 100 }),
     prisma.shop.findUnique({
       where: { id: context.shopId },
       select: { currency: true },
+    }),
+    prisma.businessDocument.findMany({
+      where: { shopId: context.shopId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
     }),
   ]);
 
   return (
     <PurchasesClient
       orders={ordersResult.items}
+      documents={documents}
       shopSlug={shopSlug}
       currency={shop?.currency || "USD"}
     />

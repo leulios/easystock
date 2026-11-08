@@ -597,4 +597,716 @@ describe("Telegram Bot Integration & Security", () => {
       expect.stringContaining("3 units")
     );
   });
+
+  describe("Platform Administrator Diagnostics & Control", () => {
+    const mockAdminId = "user-tg-admin-01";
+    const mockAdminChatId = "555666777";
+
+    it("allows SUPER_ADMIN to execute /syshealth and reports system metrics", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-admin",
+        userId: mockAdminId,
+        shopId: mockShopId,
+        telegramChatId: mockAdminChatId,
+        isActive: true,
+        user: {
+          id: mockAdminId,
+          fullName: "Platform Super Admin",
+          email: "admin@easystock.app",
+          platformRole: "SUPER_ADMIN",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "count").mockResolvedValue(15);
+      vi.spyOn(prisma.approvalRequest, "count").mockResolvedValue(3);
+      vi.spyOn(prisma.businessDocument, "count").mockResolvedValue(28);
+      vi.spyOn(prisma.telegramAccount, "findMany").mockResolvedValue([
+        { shopId: "shop-1" },
+        { shopId: "shop-2" },
+      ] as any);
+      vi.spyOn(telegramClient, "getWebhookInfo").mockResolvedValue({
+        url: "https://easystock.app/api/telegram/webhook",
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 201,
+        message: {
+          message_id: 110,
+          date: Date.now(),
+          chat: { id: Number(mockAdminChatId), type: "private" },
+          text: "/syshealth",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockAdminChatId,
+        expect.stringContaining("Platform Health & Bot Diagnostics")
+      );
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockAdminChatId,
+        expect.stringContaining("Active Telegram Accounts:</b> 15")
+      );
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockAdminChatId,
+        expect.stringContaining("Zero-Impersonation Status: Active")
+      );
+    });
+
+    it("allows SUPER_ADMIN to broadcast system announcements to all active users", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-admin",
+        userId: mockAdminId,
+        shopId: mockShopId,
+        telegramChatId: mockAdminChatId,
+        isActive: true,
+        user: {
+          id: mockAdminId,
+          fullName: "Platform Super Admin",
+          email: "admin@easystock.app",
+          platformRole: "SUPER_ADMIN",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "findMany").mockResolvedValue([
+        { telegramChatId: "111" },
+        { telegramChatId: "222" },
+        { telegramChatId: "111" }, // duplicate check
+      ] as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 202,
+        message: {
+          message_id: 111,
+          date: Date.now(),
+          chat: { id: Number(mockAdminChatId), type: "private" },
+          text: "/broadcast Maintenance scheduled for midnight tonight.",
+        },
+      });
+
+      // Dispatched to both unique accounts
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        "111",
+        expect.stringContaining("Maintenance scheduled for midnight tonight.")
+      );
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        "222",
+        expect.stringContaining("Maintenance scheduled for midnight tonight.")
+      );
+      // Admin receives confirmation
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockAdminChatId,
+        expect.stringContaining("Broadcast Dispatched:</b> Successfully sent announcement to <b>2</b> active Telegram account(s).")
+      );
+    });
+
+    it("blocks non-SUPER_ADMIN users from executing /syshealth or /broadcast", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-staff",
+        userId: mockStaffId,
+        shopId: mockShopId,
+        telegramChatId: mockStaffChatId,
+        isActive: true,
+        user: {
+          id: mockStaffId,
+          fullName: "Tigist Cashier",
+          email: "tigist@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 203,
+        message: {
+          message_id: 112,
+          date: Date.now(),
+          chat: { id: Number(mockStaffChatId), type: "private" },
+          text: "/syshealth",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("Access Denied:</b> This command is restricted to Platform Administrators.")
+      );
+    });
+
+    it("enforces Zero-Impersonation boundary: platform admin without owner role cannot view shop /summary", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-admin",
+        userId: mockAdminId,
+        shopId: mockShopId,
+        telegramChatId: mockAdminChatId,
+        isActive: true,
+        user: {
+          id: mockAdminId,
+          fullName: "Platform Super Admin",
+          email: "admin@easystock.app",
+          platformRole: "SUPER_ADMIN",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 204,
+        message: {
+          message_id: 113,
+          date: Date.now(),
+          chat: { id: Number(mockAdminChatId), type: "private" },
+          text: "/summary",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockAdminChatId,
+        expect.stringContaining("Restricted:</b> Business-wide financial summaries are available to Shop Owners only.")
+      );
+    });
+  });
+
+  describe("Role-Specific Main Menus & Isolation", () => {
+    it("renders Owner Menu with business overview, approvals, invoices, and communication", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-owner",
+        userId: mockOwnerId,
+        shopId: mockShopId,
+        telegramChatId: mockOwnerChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockOwnerId,
+          fullName: "Abebe Owner",
+          email: "owner@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOP_OWNER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 301,
+        message: {
+          message_id: 120,
+          date: Date.now(),
+          chat: { id: Number(mockOwnerChatId), type: "private" },
+          text: "/menu",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockOwnerChatId,
+        expect.stringContaining("Owner Communication & Action Center"),
+        expect.objectContaining({
+          reply_markup: expect.objectContaining({
+            inline_keyboard: expect.arrayContaining([
+              expect.arrayContaining([
+                expect.objectContaining({ text: "📊 Sales Summary" }),
+                expect.objectContaining({ text: "⏳ Pending Approvals" }),
+              ]),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it("renders Shopkeeper Menu and hides Owner-only operational controls", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-staff",
+        userId: mockStaffId,
+        shopId: mockShopId,
+        telegramChatId: mockStaffChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockStaffId,
+          fullName: "Tigist Cashier",
+          email: "tigist@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 302,
+        message: {
+          message_id: 121,
+          date: Date.now(),
+          chat: { id: Number(mockStaffChatId), type: "private" },
+          text: "/menu",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("Shopkeeper Center"),
+        expect.objectContaining({
+          reply_markup: expect.objectContaining({
+            inline_keyboard: expect.arrayContaining([
+              expect.arrayContaining([
+                expect.objectContaining({ text: "🛍️ My Shift Sales" }),
+                expect.objectContaining({ text: "🔍 Check Stock & Price" }),
+              ]),
+            ]),
+          }),
+        })
+      );
+    });
+
+    it("strictly blocks Shopkeeper from accessing /invoices, /pending, and /alerts", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-staff",
+        userId: mockStaffId,
+        shopId: mockShopId,
+        telegramChatId: mockStaffChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockStaffId,
+          fullName: "Tigist Cashier",
+          email: "tigist@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 303,
+        message: {
+          message_id: 122,
+          date: Date.now(),
+          chat: { id: Number(mockStaffChatId), type: "private" },
+          text: "/invoices",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("Available to Shop Owners only.")
+      );
+    });
+  });
+
+  describe("Owner-Shopkeeper Communication & Announcements", () => {
+    it("allows Owner to broadcast an announcement to all shopkeepers with tracking ref", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-owner",
+        userId: mockOwnerId,
+        shopId: mockShopId,
+        telegramChatId: mockOwnerChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockOwnerId,
+          fullName: "Abebe Owner",
+          email: "owner@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOP_OWNER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.userMembership, "findFirst").mockResolvedValue({
+        organizationId: mockOrgId,
+        shopId: mockShopId,
+        role: ShopRole.SHOP_OWNER,
+        organization: { id: mockOrgId },
+      } as any);
+
+      vi.spyOn(prisma.shopMessage, "create").mockResolvedValue({
+        id: "msg-001",
+        referenceCode: "MSG-20261108-TEST",
+        shopId: mockShopId,
+        senderId: mockOwnerId,
+        recipientId: null,
+        category: "GENERAL",
+        content: "Staff meeting tonight at 6:00 PM.",
+        createdAt: new Date(),
+        sender: { id: mockOwnerId, fullName: "Abebe Owner" },
+      } as any);
+
+      vi.spyOn(prisma.auditLog, "create").mockResolvedValue({} as any);
+
+      // Staff recipient account
+      vi.spyOn(prisma.telegramAccount, "findMany").mockResolvedValue([
+        {
+          telegramChatId: mockStaffChatId,
+          isActive: true,
+          notificationPreferences: { messages: true },
+        },
+      ] as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 304,
+        message: {
+          message_id: 123,
+          date: Date.now(),
+          chat: { id: Number(mockOwnerChatId), type: "private" },
+          text: "/msg all Staff meeting tonight at 6:00 PM.",
+        },
+      });
+
+      // Staff received announcement with sender and ref code
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("OWNER ANNOUNCEMENT")
+      );
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("Staff meeting tonight at 6:00 PM.")
+      );
+      // Owner received confirmation with ref code
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockOwnerChatId,
+        expect.stringContaining("MSG-20261108-TEST")
+      );
+    });
+
+    it("allows Shopkeeper to send a note to the Owner with tracking ref", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-staff",
+        userId: mockStaffId,
+        shopId: mockShopId,
+        telegramChatId: mockStaffChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockStaffId,
+          fullName: "Tigist Cashier",
+          email: "tigist@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.userMembership, "findFirst").mockResolvedValue({
+        organizationId: mockOrgId,
+        shopId: mockShopId,
+        role: ShopRole.SHOPKEEPER,
+        organization: { id: mockOrgId },
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "findMany").mockResolvedValue([
+        {
+          userId: mockOwnerId,
+          telegramChatId: mockOwnerChatId,
+          user: { fullName: "Abebe Owner" },
+        },
+      ] as any);
+
+      vi.spyOn(prisma.shopMessage, "create").mockResolvedValue({
+        id: "msg-002",
+        referenceCode: "MSG-20261108-NOTE",
+        shopId: mockShopId,
+        senderId: mockStaffId,
+        recipientId: mockOwnerId,
+        category: "GENERAL",
+        content: "Need 2 more boxes of 1L sunflower oil on the shelf.",
+        createdAt: new Date(),
+        sender: { id: mockStaffId, fullName: "Tigist Cashier" },
+      } as any);
+
+      vi.spyOn(prisma.auditLog, "create").mockResolvedValue({} as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 305,
+        message: {
+          message_id: 124,
+          date: Date.now(),
+          chat: { id: Number(mockStaffChatId), type: "private" },
+          text: "/msgowner Need 2 more boxes of 1L sunflower oil on the shelf.",
+        },
+      });
+
+      // Shopkeeper gets confirmation
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("MSG-20261108-NOTE")
+      );
+    });
+  });
+
+  describe("Notifications Center & Preferences Toggling", () => {
+    it("toggles notification preference via interactive callback query", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-owner",
+        userId: mockOwnerId,
+        shopId: mockShopId,
+        telegramChatId: mockOwnerChatId,
+        isActive: true,
+        language: "en",
+        notificationPreferences: { newSales: true, dailySummary: true },
+        user: {
+          id: mockOwnerId,
+          fullName: "Abebe Owner",
+          email: "owner@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOP_OWNER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "findUnique").mockResolvedValue({
+        id: "tg-acc-owner",
+        telegramChatId: mockOwnerChatId,
+        notificationPreferences: { newSales: true, dailySummary: true },
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "update").mockResolvedValue({
+        id: "tg-acc-owner",
+        notificationPreferences: { newSales: false, dailySummary: true },
+      } as any);
+
+      const editReplyMarkupSpy = vi.spyOn(telegramClient, "editMessageReplyMarkup").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 306,
+        callback_query: {
+          id: "cb-notif-01",
+          from: { id: Number(mockOwnerChatId), is_bot: false, first_name: "Abebe" },
+          message: {
+            message_id: 88,
+            chat: { id: Number(mockOwnerChatId), type: "private" },
+            date: Date.now(),
+          },
+          data: "notif_tog:newSales",
+        },
+      });
+
+      expect(editReplyMarkupSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("Language Support (English & Amharic)", () => {
+    it("switches bot language to Amharic and updates reply keyboard", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-owner",
+        userId: mockOwnerId,
+        shopId: mockShopId,
+        telegramChatId: mockOwnerChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockOwnerId,
+          fullName: "Abebe Owner",
+          email: "owner@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOP_OWNER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "findUnique").mockResolvedValue({
+        id: "tg-acc-owner",
+        telegramChatId: mockOwnerChatId,
+      } as any);
+
+      vi.spyOn(prisma.telegramAccount, "update").mockResolvedValue({
+        id: "tg-acc-owner",
+        language: "am",
+      } as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 307,
+        callback_query: {
+          id: "cb-lang-01",
+          from: { id: Number(mockOwnerChatId), is_bot: false, first_name: "Abebe" },
+          message: {
+            message_id: 89,
+            chat: { id: Number(mockOwnerChatId), type: "private" },
+            date: Date.now(),
+          },
+          data: "lang:am",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockOwnerChatId,
+        expect.stringContaining("ቋንቋው በተሳካ ሁኔታ ወደ አማርኛ ተቀይሯል"),
+        expect.objectContaining({
+          reply_markup: expect.objectContaining({
+            keyboard: expect.arrayContaining([
+              expect.arrayContaining([{ text: "📊 የንግድ ማጠቃለያ" }]),
+            ]),
+          }),
+        })
+      );
+    });
+  });
+
+  describe("Request Tracking & Status Updates", () => {
+    it("submitting a request generates a unique reference code and alerts owner", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-staff",
+        userId: mockStaffId,
+        shopId: mockShopId,
+        telegramChatId: mockStaffChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockStaffId,
+          fullName: "Tigist Cashier",
+          email: "tigist@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.userMembership, "findFirst").mockResolvedValue({
+        organizationId: mockOrgId,
+        shopId: mockShopId,
+        role: ShopRole.SHOPKEEPER,
+        organization: { id: mockOrgId },
+      } as any);
+
+      vi.spyOn(prisma.approvalRequest, "create").mockResolvedValue({
+        id: "req-001",
+        referenceCode: "REQ-20261108-ABCD",
+        shopId: mockShopId,
+        requesterId: mockStaffId,
+        approvalType: "STOCK_ADJUSTMENT",
+        title: "2 cartons of water damaged",
+        details: { description: "2 cartons of water damaged" },
+        status: "PENDING",
+        requester: { id: mockStaffId, fullName: "Tigist Cashier" },
+        shop: { id: mockShopId, name: "Main Store" },
+      } as any);
+
+      vi.spyOn(prisma.auditLog, "create").mockResolvedValue({} as any);
+
+      // Owner accounts
+      vi.spyOn(prisma.telegramAccount, "findMany").mockResolvedValue([
+        {
+          telegramChatId: mockOwnerChatId,
+          isActive: true,
+          language: "en",
+          notifications: "ALL",
+          notificationPreferences: { approvals: true },
+        },
+      ] as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 308,
+        message: {
+          message_id: 125,
+          date: Date.now(),
+          chat: { id: Number(mockStaffChatId), type: "private" },
+          text: "/request 2 cartons of water damaged",
+        },
+      });
+
+      // Requester gets ref code
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("REQ-20261108-ABCD")
+      );
+      // Owner receives request card with ref code
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockOwnerChatId,
+        expect.stringContaining("REQ-20261108-ABCD"),
+        expect.anything()
+      );
+    });
+
+    it("allows shopkeeper to view their submitted requests with /myrequests", async () => {
+      vi.spyOn(prisma.telegramAccount, "findFirst").mockResolvedValue({
+        id: "tg-acc-staff",
+        userId: mockStaffId,
+        shopId: mockShopId,
+        telegramChatId: mockStaffChatId,
+        isActive: true,
+        language: "en",
+        user: {
+          id: mockStaffId,
+          fullName: "Tigist Cashier",
+          email: "tigist@easystock.app",
+          platformRole: "NONE",
+          isActive: true,
+          memberships: [{ shopId: mockShopId, role: ShopRole.SHOPKEEPER }],
+        },
+        shop: { id: mockShopId, name: "Main Store", code: "MAIN", currency: "ETB" },
+      } as any);
+
+      vi.spyOn(prisma.userMembership, "findFirst").mockResolvedValue({
+        organizationId: mockOrgId,
+        shopId: mockShopId,
+        role: ShopRole.SHOPKEEPER,
+        organization: { id: mockOrgId },
+      } as any);
+
+      vi.spyOn(prisma.approvalRequest, "findMany").mockResolvedValue([
+        {
+          id: "req-001",
+          referenceCode: "REQ-20261108-ABCD",
+          title: "2 cartons of water damaged",
+          status: "APPROVED",
+          createdAt: new Date(),
+        },
+      ] as any);
+
+      const sendMessageSpy = vi.spyOn(telegramClient, "sendMessage").mockResolvedValue({} as any);
+
+      await telegramRouter.handleUpdate({
+        update_id: 309,
+        message: {
+          message_id: 126,
+          date: Date.now(),
+          chat: { id: Number(mockStaffChatId), type: "private" },
+          text: "/myrequests",
+        },
+      });
+
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("REQ-20261108-ABCD")
+      );
+      expect(sendMessageSpy).toHaveBeenCalledWith(
+        mockStaffChatId,
+        expect.stringContaining("APPROVED")
+      );
+    });
+  });
 });

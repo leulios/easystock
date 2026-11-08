@@ -3,6 +3,7 @@ import { TenantContext } from "../tenant/context";
 import { CreateSaleInput, ReturnSaleInput } from "../validations/sales";
 import { MovementType, SaleStatus, PaymentMethod, Prisma, ShopRole } from "@prisma/client";
 import { Decimal, calculateLineTotal, calculateTax } from "../decimal";
+import { notifyOwnerLowStock, notifyOwnerNewSale } from "../telegram/notifier";
 
 export interface ListSalesOptions {
   status?: SaleStatus;
@@ -119,6 +120,15 @@ export async function createSale(context: TenantContext, input: CreateSaleInput)
     1000 + Math.random() * 9000
   )}`;
 
+  const lowStockAlerts: {
+    productName: string;
+    variantName: string;
+    sku: string;
+    currentQuantity: number;
+    reorderLevel: number;
+    currency: string;
+  }[] = [];
+
   // 6. Execute atomic database transaction
   const result = await prisma.$transaction(async (tx) => {
     // A. Check and deduct inventory atomically
@@ -147,6 +157,17 @@ export async function createSale(context: TenantContext, input: CreateSaleInput)
         throw new Error(
           `Insufficient stock for "${variant.product.name} (${variant.name})". Available: ${inventory.quantity}, Requested: ${item.quantity}.`
         );
+      }
+
+      if (newBalance <= variant.reorderLevel) {
+        lowStockAlerts.push({
+          productName: variant.product.name,
+          variantName: variant.name,
+          sku: variant.sku,
+          currentQuantity: newBalance,
+          reorderLevel: variant.reorderLevel,
+          currency: shop.currency,
+        });
       }
 
       // Update inventory balance
@@ -270,6 +291,27 @@ export async function createSale(context: TenantContext, input: CreateSaleInput)
     });
 
     return sale;
+  });
+
+  // Trigger real-time low stock Telegram alerts for the shop owner asynchronously
+  if (lowStockAlerts.length > 0) {
+    for (const alertItem of lowStockAlerts) {
+      notifyOwnerLowStock(shopId, alertItem).catch((err) => {
+        console.error("[TelegramNotifier] Low stock notification error:", err);
+      });
+    }
+  }
+
+  // Trigger real-time new sale notification to shop owner (respects notification preferences)
+  notifyOwnerNewSale(shopId, {
+    receiptNumber: result.receiptNumber,
+    totalAmount: Number(result.totalAmount).toFixed(2),
+    currency: shop.currency,
+    itemsCount: input.items.length,
+    cashierName: user.fullName || "Cashier",
+    paymentMethod: input.payments.map((p) => p.paymentMethod).join(", "),
+  }).catch((err) => {
+    console.error("[TelegramNotifier] Sale notification error:", err);
   });
 
   return { sale: result, isDuplicateReplay: false };

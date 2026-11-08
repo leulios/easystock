@@ -190,9 +190,11 @@ export async function resolveTelegramContext(chatId: string): Promise<BotContext
   );
 
   const role = membership?.role || ShopRole.SHOPKEEPER;
+  const language = (account.language as "en" | "am") || "en";
 
   return {
     chatId,
+    language,
     isLinked: true,
     user: {
       id: user.id,
@@ -209,10 +211,74 @@ export async function resolveTelegramContext(chatId: string): Promise<BotContext
     role,
     telegramAccount: {
       id: account.id,
+      language,
       notifications: account.notifications,
+      notificationPreferences: (account.notificationPreferences as any) || {
+        newSales: true,
+        dailySummary: true,
+        lowStock: true,
+        inventoryRequests: true,
+        approvals: true,
+        purchaseInvoices: true,
+        messages: true,
+        businessEvents: true,
+      },
       telegramUsername: account.telegramUsername,
     },
   };
+}
+
+/**
+ * Updates the preferred language for a Telegram user ("en" or "am").
+ */
+export async function updateTelegramLanguage(chatId: string, language: "en" | "am"): Promise<boolean> {
+  const account = await prisma.telegramAccount.findUnique({
+    where: { telegramChatId: chatId },
+  });
+
+  if (!account) return false;
+
+  await prisma.telegramAccount.update({
+    where: { id: account.id },
+    data: { language },
+  });
+
+  return true;
+}
+
+/**
+ * Updates granular notification preferences for a Telegram account.
+ */
+export async function updateTelegramNotificationPreferences(
+  chatId: string,
+  key: string,
+  enabled: boolean
+): Promise<{ success: boolean; preferences: Record<string, boolean> }> {
+  const account = await prisma.telegramAccount.findUnique({
+    where: { telegramChatId: chatId },
+  });
+
+  if (!account) return { success: false, preferences: {} };
+
+  const currentPrefs: Record<string, boolean> = (account.notificationPreferences as any) || {
+    newSales: true,
+    dailySummary: true,
+    lowStock: true,
+    inventoryRequests: true,
+    approvals: true,
+    purchaseInvoices: true,
+    messages: true,
+    businessEvents: true,
+  };
+
+  currentPrefs[key] = enabled;
+
+  await prisma.telegramAccount.update({
+    where: { id: account.id },
+    data: { notificationPreferences: currentPrefs },
+  });
+
+  return { success: true, preferences: currentPrefs };
 }
 
 /**

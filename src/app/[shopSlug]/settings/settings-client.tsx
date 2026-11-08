@@ -41,6 +41,7 @@ import {
 import {
   getTelegramLinkUrlAction,
   disconnectTelegramAction,
+  updateTelegramNotificationPreferencesAction,
 } from "@/app/actions/telegram";
 
 interface StaffItem {
@@ -93,6 +94,8 @@ interface SettingsClientProps {
     telegramUsername: string | null;
     firstName: string | null;
     isActive: boolean;
+    language?: string;
+    notificationPreferences?: any;
     createdAt: Date;
   } | null;
 }
@@ -142,6 +145,27 @@ export function SettingsClient({
     } else {
       alert(res.error || (language === "am" ? "ማላቀቅ አልተቻለም" : "Failed to disconnect"));
     }
+  };
+
+  const [prefs, setPrefs] = useState<Record<string, boolean>>(
+    (telegramAccount?.notificationPreferences as any) || {
+      newSales: true,
+      dailySummary: true,
+      lowStock: true,
+      approvals: true,
+      purchaseInvoices: true,
+      messages: true,
+      businessEvents: true,
+    }
+  );
+  const [isUpdatingPrefs, setIsUpdatingPrefs] = useState(false);
+
+  const handleTogglePref = async (key: string) => {
+    const updated = { ...prefs, [key]: !prefs[key] };
+    setPrefs(updated);
+    setIsUpdatingPrefs(true);
+    await updateTelegramNotificationPreferencesAction(updated);
+    setIsUpdatingPrefs(false);
   };
 
   // Shop settings form state
@@ -879,36 +903,95 @@ export function SettingsClient({
 
             {/* Connection Details if Active */}
             {telegramAccount?.isActive ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    {t("telegramChatIdLabel")}
-                  </span>
-                  <span className="text-xs font-mono font-bold text-slate-800">
-                    {telegramAccount.telegramChatId}
-                  </span>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                      {t("telegramChatIdLabel")}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-800">
+                      {telegramAccount.telegramChatId}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                      {t("telegramUsernameLabel")}
+                    </span>
+                    <span className="text-xs font-medium text-slate-800">
+                      {telegramAccount.telegramUsername ? `@${telegramAccount.telegramUsername}` : (language === "am" ? "የለም" : "Not set")}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
+                      {t("telegramLinkedSince")}
+                    </span>
+                    <span className="text-xs text-slate-600">
+                      {new Date(telegramAccount.createdAt).toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    {t("telegramUsernameLabel")}
-                  </span>
-                  <span className="text-xs font-medium text-slate-800">
-                    {telegramAccount.telegramUsername ? `@${telegramAccount.telegramUsername}` : (language === "am" ? "የለም" : "Not set")}
-                  </span>
+
+                {/* Notification Preferences Section */}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                        {language === "am" ? "የቴሌግራም ማሳወቂያ ምርጫዎች" : "Notification Channel Preferences"}
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        {language === "am"
+                          ? "ወደ ቴሌግራም የሚላኩ ማሳወቂያዎችን ያብሩ ወይም ያጥፉ"
+                          : "Control which alerts and summaries get dispatched to your Telegram chat."}
+                      </p>
+                    </div>
+                    {isUpdatingPrefs && (
+                      <span className="text-[11px] text-blue-600 animate-pulse font-medium">
+                        {language === "am" ? "በማስቀመጥ ላይ..." : "Saving..."}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {[
+                      { key: "newSales", label: language === "am" ? "አዲስ ሽያጭ" : "New Sales", desc: language === "am" ? "በ POS ሽያጭ ሲጠናቀቅ" : "Real-time POS checkout alerts" },
+                      { key: "dailySummary", label: language === "am" ? "የዕለት ማጠቃለያ" : "Daily Business Summary", desc: language === "am" ? "የቀን ማጠቃለያና ምርጥ ዕቃዎች" : "Automated revenue & top products" },
+                      { key: "lowStock", label: language === "am" ? "ዝቅተኛ ክምችት" : "Low Stock Alerts", desc: language === "am" ? "ዕቃ ከደረጃው በታች ሲወርድ" : "Items reaching reorder threshold" },
+                      { key: "approvals", label: language === "am" ? "ውሳኔ የሚጠብቁ ጥያቄዎች" : "Approval Requests", desc: language === "am" ? "የሰራተኞች የክምችት ማስተካከያ" : "Discrepancy and ledger updates" },
+                      { key: "purchaseInvoices", label: language === "am" ? "የግዢ ደረሰኞች" : "Purchase Invoices", desc: language === "am" ? "የተላኩ ደረሰኞችና ወረቀቶች" : "Uploaded paper receipt intakes" },
+                      { key: "messages", label: language === "am" ? "የሰራተኞች መልዕክት" : "Staff Messages", desc: language === "am" ? "ከሰራተኞች የሚላኩ መልዕክቶች" : "Direct communication & staff notes" },
+                      { key: "businessEvents", label: language === "am" ? "የንግድ ክስተቶች" : "Business Events", desc: language === "am" ? "አስፈላጊ የስርዓት ክስተቶች" : "Audit warnings and shop operations" },
+                    ].map((item) => (
+                      <div
+                        key={item.key}
+                        onClick={() => handleTogglePref(item.key)}
+                        className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                          prefs[item.key] !== false
+                            ? "bg-sky-50/50 border-sky-200 text-slate-800"
+                            : "bg-slate-50/50 border-slate-200 text-slate-500 opacity-70"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-xs font-semibold">{item.label}</div>
+                          <div className="text-[10px] text-slate-500">{item.desc}</div>
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            prefs[item.key] !== false
+                              ? "bg-sky-500 text-white"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {prefs[item.key] !== false ? "ON" : "OFF"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
-                    {t("telegramLinkedSince")}
-                  </span>
-                  <span className="text-xs text-slate-600">
-                    {new Date(telegramAccount.createdAt).toLocaleDateString(language === "am" ? "am-ET" : "en-US", {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                </div>
-              </div>
+              </>
             ) : (
               <div className="p-4 bg-sky-50/60 border border-sky-100 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-sky-800">
                 <div className="flex items-center gap-2.5">
